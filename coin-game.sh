@@ -1,19 +1,17 @@
 #!/bin/bash
 
-new_game() {
-	echo "Starting Game..."
-}
+LOADING_TITLE=$(cat << "EOF" 
+██       ██████   █████  ██████  ██ ███    ██  ██████ 
+██      ██    ██ ██   ██ ██   ██ ██ ████   ██ ██      
+██      ██    ██ ███████ ██   ██ ██ ██ ██  ██ ██   ███ 
+██      ██    ██ ██   ██ ██   ██ ██ ██  ██ ██ ██    ██ 
+███████  ██████  ██   ██ ██████  ██ ██   ████  ██████  ██ ██ ██ 
+EOF
+)
 
-exit_game() {
-	echo "Exiting Game..."
-}
-
-clear
-
-echo -e "\e[1;31m"
-cat << "EOF"
-=============================================================
-=============================================================
+GAME_TITLE=$(cat << "EOF"
+==============================================================
+==============================================================
 
 
  ██████╗ ██████╗ ██╗███╗   ██╗    ███████╗██╗     ██╗██████╗
@@ -22,25 +20,52 @@ cat << "EOF"
 ██║     ██║   ██║██║██║╚██╗██║    ██╔══╝  ██║     ██║██╔═══╝
 ╚██████╗╚██████╔╝██║██║ ╚████║    ██║     ███████╗██║██║
  ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝    ╚═╝     ╚══════╝╚═╝╚═╝
+   A Game Where You Must Guess Between Heads or Tails
 
-
+==============================================================
 =============================================================
-=============================================================
-
 EOF
-echo -e "   A Game Where You Must Guess Between Heads or Tails"
+)
 
+loading_screen() {
+	clear
+	
+	echo -e "\e[1;31m"
+	echo "$LOADING_TITLE"
+	echo -e "\e[0m"
+	
+	sleep 1.5
+}
+
+new_game() {
+	:
+}
+
+exit_game() {
+	exit
+}
+
+clear
+
+echo -e "\e[1;31m"
+echo "$GAME_TITLE"
 echo -e "\e[0m"
 
-echo "[1] New Game"
-echo "[2] Exit Game"
-read -p "> " start_game
+echo -e "\e[1;31m[1]\e[0m New Game"
+echo -e "\e[1;31m[2]\e[0m Exit Game"
 
-case "$start_game" in 
-	1|"New Game")
+read -p "> " choice
+
+case "$choice" in 
+	1)
+		loading_screen
 		new_game
 		;;
-	2|"Exit Game")
+	2)
+		exit_game
+		;;
+	*)
+		echo "Enter a valid numerical input next time."
 		exit_game
 		;;
 esac
