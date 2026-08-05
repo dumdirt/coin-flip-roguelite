@@ -27,7 +27,7 @@ GAME_TITLE=$(cat <<- "EOF"
 # ==============================================================
 player_name=""
 gold_balance=100
-streak=1
+streak=0
 multiplier=100
 round=1
 current_event="..."
@@ -47,7 +47,7 @@ WHITE=$'\e[1;37m'
 RESET=$'\e[0m'
 
 # =============================================================
-# MULTIPLIER DECIMAL DISPLAY
+# DECIMAL DISPLAY SYSTEM
 # =============================================================
 display_multiplier() {
 	printf "x%d.%d" $((multiplier / 100)) $((multiplier % 100))
@@ -61,6 +61,15 @@ loading_screen() {
 	echo -e "${RED}LOADING...${RESET}"
 	sleep 1.5
 	clear
+}
+
+# =============================================================
+# GET PLAYER NAME
+# =============================================================
+get_player_name() {
+	clear
+	echo -e "${RED}Enter your Player Name${RESET}"
+	read -p " >  " player_name
 }
 
 # =============================================================
@@ -141,10 +150,12 @@ new_game() {
 		read -p " >  " choice
 		case "$choice" in
 			1)
+				get_player_name
 				loading_screen
 				standard_mode
 				;;
 			2)
+				get_player_name
 				loading_screen
 				infinite_mode
 				;;
@@ -261,20 +272,82 @@ exit_game() {
 # =============================================================
 # GAME LOGIC
 # =============================================================
-standard_mode() {
+place_bet() {
 	clear
-	echo -e "${RED}Enter your Player Name${RESET}"
-	read -p " >  " player_name
-	loading_screen
+	
+	cat <<- EOF
+	${RED}=============================================================${RESET}
+	${RED}Betting Rules ${RESET}
+	~~~ WARNING: Betting will end the current round ~~~
+	1. All bets must be at least 10 coins and an integer number.
+	2. All winnings will be rounded down to the nearest whole number.
+	
+	You currently have ${YELLOW}$gold_balance${RESET} coins.
+	${RED}=============================================================${RESET}
+	EOF
 
-	game_banner
-	player_stats
-	dialogue_box
-	player_options
+	echo -e "${RED}Enter your bet amount:${RESET}"
+	local bet_amount=""
+	while [[ "$bet_amount" -gt "$gold_balance" || "$bet_amount" -lt 10 || ! "$bet_amount" =~ ^[0-9]+$ ]]
+	do
+		read -p " >  " bet_amount
+	done
+
+	echo -e "${RED}Choose 'HEADS' or 'TAILS':${RESET}"
+	local player_guess=""
+	while [[ "$player_guess" != "HEADS" && "$player_guess" != "TAILS" ]]
+	do
+		read -p " >  " player_guess
+	done
+
+	echo -e "\n${RED}[1]${RESET} Confirm Bet"
+	echo -e "${RED}[2]${RESET} Cancel Bet"
+	local choice=""
+	while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
+	do
+		read -p " >  " choice
+		case "$choice" in
+			1)
+				flip_coin "$player_guess" "$bet_amount"
+				standard_mode
+				;;
+			2)
+				standard_mode
+				;;
+			*)
+				echo -e "${RED}Enter a valid numerical input.${RESET}"
+				;;
+		esac
+	done
 }
 
-infinite_mode() {
+flip_coin() {
 	clear
+
+	echo -e "${RED}Flipping Coin...${RESET}"
+	sleep 1.5
+
+	local coin_result=$((RANDOM % 2))
+	if [[ "$coin_result" -eq 0 ]]
+	then
+		coin_result="HEADS"
+	else
+		coin_result="TAILS"
+	fi
+
+	if [[ "$player_guess" == "$coin_result" ]]
+	then
+		local winnings=$((bet_amount * multiplier / 100))
+		gold_balance=$((gold_balance + winnings))
+		dialogue="You guessed correctly! You ${GREEN}won${RESET} ${YELLOW}$winnings${RESET} coins."
+		streak=$((streak + 1))
+	else
+		gold_balance=$((gold_balance - bet_amount))
+		dialogue="You guessed incorrectly. You ${RED}lost${RESET} ${YELLOW}$bet_amount${RESET} coins."
+		streak=0
+	fi
+
+	round=$((round + 1))
 }
 
 # =============================================================
@@ -298,7 +371,7 @@ player_stats() {
 	👤 Player Name: ${WHITE}$player_name${RESET}
 
 	🪙  Gold Balance: ${YELLOW}$gold_balance${RESET}              ❌ Multiplier: ${GREEN}$(display_multiplier)${RESET}
-	⏰ Round Number: ${BLUE}$round${RESET}                🔥 Streak: ${CYAN}$streak${RESET}
+	⏰ Round Number: ${BLUE}$round${RESET}                   🔥 Streak: ${CYAN}$streak${RESET}
 	🎲 Current Event: ${PURPLE}$current_event${RESET}
 	${RED}=============================================================${RESET}
 	EOF
@@ -326,7 +399,7 @@ player_options() {
 		read -p " >  " choice
 		case "$choice" in
 			1)
-				:
+				place_bet
 				;;
 			2)
 				:
@@ -342,6 +415,25 @@ player_options() {
 				;;
 		esac
 	done
+}
+
+# =============================================================
+# GAME MODES
+# =============================================================
+standard_mode() {
+	clear
+
+	while [[ "$gold_balance" -lt 10000 && "$gold_balance" -ge 10 ]]
+	do
+		game_banner
+		player_stats
+		dialogue_box
+		player_options
+	done
+}
+
+infinite_mode() {
+	clear
 }
 
 # Start game by displaying the main menu
