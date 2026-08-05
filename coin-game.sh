@@ -31,7 +31,9 @@ streak=0
 multiplier=100
 round=1
 current_event="..."
-dialogue="..."
+dialogue_bet="..."
+dialogue_multiplier="..."
+dialogue_event="..."
 inventory=()
 
 # ==============================================================
@@ -339,11 +341,25 @@ flip_coin() {
 	then
 		local winnings=$((bet_amount * multiplier / 100))
 		gold_balance=$((gold_balance + winnings))
-		dialogue="You guessed correctly! You ${GREEN}won${RESET} ${YELLOW}$winnings${RESET} coins."
+		dialogue_bet="You guessed correctly! You ${GREEN}won${RESET} ${YELLOW}$winnings${RESET} coins."
 		streak=$((streak + 1))
+		if [[ "$streak" -ge 5 ]]
+		then
+			if [[ $((streak % 5)) -eq 0 ]]
+			then
+				multiplier=$((multiplier + (streak / 5) * 50))
+				dialogue_multiplier="Streak achieved! Multiplier increased to ${GREEN}$(display_multiplier)${RESET}."
+			elif [[ $((streak % 5)) -ne 0 ]]
+			then
+				dialogue_multiplier="..."
+			fi
+		elif [[ "$streak" -lt 5 && "$multiplier" -gt 100 ]]
+		then
+			multiplier=100
+		fi
 	else
 		gold_balance=$((gold_balance - bet_amount))
-		dialogue="You guessed incorrectly. You ${RED}lost${RESET} ${YELLOW}$bet_amount${RESET} coins."
+		dialogue_bet="You guessed incorrectly. You ${RED}lost${RESET} ${YELLOW}$bet_amount${RESET} coins."
 		streak=0
 	fi
 
@@ -367,20 +383,19 @@ game_banner() {
 }
 
 player_stats() {
-	cat <<- EOF
-	👤 Player Name: ${WHITE}$player_name${RESET}
-
-	🪙  Gold Balance: ${YELLOW}$gold_balance${RESET}              ❌ Multiplier: ${GREEN}$(display_multiplier)${RESET}
-	⏰ Round Number: ${BLUE}$round${RESET}                   🔥 Streak: ${CYAN}$streak${RESET}
-	🎲 Current Event: ${PURPLE}$current_event${RESET}
-	${RED}=============================================================${RESET}
-	EOF
+	echo -e "👤 Player Name: ${WHITE}$player_name${RESET}\n"
+	printf "🪙  Gold Balance: ${YELLOW}%-10s${RESET} ❌ Multiplier: ${GREEN}%-10s${RESET}" "$gold_balance" "$(display_multiplier)"
+	printf "\n⏰ Round Number: ${BLUE}%-10s${RESET} 🔥 Streak: ${CYAN}%-10s${RESET}" "$round" "$streak"
+	echo -e "\n🎲 Current Event: ${PURPLE}$current_event${RESET}"
+	echo -e "${RED}=============================================================${RESET}"
 }
 
 dialogue_box() {
 	cat <<- EOF
 
-	💬 ${dialogue}
+	💬 ${dialogue_bet}
+	💬 ${dialogue_multiplier}
+	💬 ${dialogue_event}
 
 	${RED}=============================================================${RESET}
 
