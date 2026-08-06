@@ -28,13 +28,24 @@ player_name=""
 gold_balance=100
 streak=0
 multiplier=100
-round=1
+round=0
 dialogue_bet="..."
 dialogue_multiplier="..."
 dialogue_event="..."
 inventory=()
 event_list=("Tax Collector" "Inheritance" "Multiplier Boost" "Unlucky Day" "Mysterious Gift" "Streak Reset" "Lucky Day" "Wheel of Fortune" "Bankruptcy" "Slot Machine")
 current_event="..."
+shop_catalogue=("Bet Insurance" "4-Leafed Clover" "Event Insurance" "Magic Dice" "Double Down Voucher" "Lucky Coin" "Shop Coupon" "Cursed Token")
+current_shop=()
+active_item="..."
+# Bet Insurance: Lose 50% of the next bet
+# 4-Leafed Clover: Guarantees a win on the next bet
+# Event Inusrance: Protects against one instance of event coin loss the next round
+# Magic Dice: Rerolls the shop's current items
+# Double Down Voucher: Gain double or lose double your next bet
+# Lucky Coin: Refund your next bet if it's a loss
+# Shop Coupon: Your next shop purchase costs 50% less
+# Cursed Token: Instantly double your multiplier, but lose 25% of your gold balance
 
 # ==============================================================
 # GAME COLOR VARIABLES
@@ -279,7 +290,8 @@ standard_mode() {
 
 	while [[ "$gold_balance" -lt 10000 && "$gold_balance" -ge 10 ]]
 	do
-		run_event
+		clear
+		trigger_event
 		game_banner
 		player_stats
 		dialogue_box
@@ -301,8 +313,8 @@ place_bet() {
 	${RED}=============================================================${RESET}
 	${RED}=============================================================${RESET}
 
-	${RED}Betting Rules ${RESET}
-	~~~ WARNING: Betting will end the current round ~~~
+	${RED}Betting Rules${RESET}
+	~~~ WARNING: Betting will end the current round. ~~~
 	1. All bets must be at least 10 coins and an integer number.
 	2. All winnings will be rounded down to the nearest whole number.
 	
@@ -328,7 +340,7 @@ place_bet() {
 	done
 
 	echo -e "\n${RED}[1]${RESET} Confirm Bet"
-	echo -e "${RED}[2]${RESET} Cancel Bet"
+	echo -e "${RED}[2]${RESET} Return to Game"
 	local choice=""
 	while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
 	do
@@ -336,10 +348,10 @@ place_bet() {
 		case "$choice" in
 			1)
 				flip_coin "$player_guess" "$bet_amount"
-				standard_mode
+				return
 				;;
 			2)
-				standard_mode
+				return
 				;;
 			*)
 				echo -e "${RED}Enter a valid numerical input.${RESET}"
@@ -351,7 +363,7 @@ place_bet() {
 flip_coin() {
 	clear
 
-	echo -e "${RED}Flipping Coin...${RESET}"
+	echo -e "${RED}FLIPPING COIN...${RESET}"
 	sleep 1.5
 
 	local coin_result=$((RANDOM % 2))
@@ -391,7 +403,7 @@ flip_coin() {
 	round=$((round + 1))
 }
 
-run_event() {
+trigger_event() {
 	if [[ $((round % 5)) -eq 0 && "$round" -ne 0 ]]
 	then
 		local event_index=$((RANDOM % ${#event_list[@]}))
@@ -482,6 +494,71 @@ run_event() {
 	fi
 }
 
+trigger_shop() {
+	clear
+
+	if [[ $((round % 5)) -eq 0 || "$round" -eq 0 ]]
+	then
+		current_shop=()
+
+		for (( i=1; i<=3; i++))
+		do
+			local shop_index=$((RANDOM % ${#shop_catalogue[@]}))
+			current_shop+=("${shop_catalogue[shop_index]}")
+		done
+	fi
+
+	cat <<- EOF
+	${RED}=============================================================${RESET}
+	${RED}=============================================================${RESET}
+
+	${RED}The Shop${RESET}
+	~~~ NOTICE: The inventory is limited to three items. ~~~
+	
+	EOF
+
+	for i in "${!current_shop[@]}"
+	do
+		printf "Item: ${PURPLE}%s${RESET}\n\n" "${current_shop[$i]}"
+	done
+
+	cat <<- EOF
+	You currently have ${YELLOW}$gold_balance${RESET} coins.
+
+	${RED}=============================================================${RESET}
+	${RED}=============================================================${RESET}
+
+	EOF
+
+	echo -e "${RED}[1]${RESET} Buy ${current_shop[0]}"
+	echo -e "${RED}[2]${RESET} Buy ${current_shop[1]}"
+	echo -e "${RED}[3]${RESET} Buy ${current_shop[2]}"
+	echo -e "${RED}[4]${RESET} Return to Game"
+
+	local choice=""
+	while [[ "$choice" -ne 1 && "$choice" -ne 2 && "$choice" -ne 3 && "$choice" -ne 4 ]]
+	do
+		read -p " >  " choice
+		case "$choice" in
+			1)
+				:
+				;;
+			2)
+				:
+				;;
+			3)
+				:
+				;;
+			4)
+				return
+				;;
+			*)
+				echo -e "${RED}Enter a valid numerical input.${RESET}"
+				;;
+		esac
+	done
+}
+
 # =============================================================
 # GAME UI
 # =============================================================
@@ -503,9 +580,9 @@ game_banner() {
 player_stats() {
 	echo -e "👤 Player Name: ${WHITE}$player_name${RESET}\n"
 	printf "🪙  Gold Balance: ${YELLOW}%-10s${RESET} ❌ Multiplier: ${GREEN}%-10s${RESET}" "$gold_balance" "$(display_multiplier)"
-	printf "\n⏰ Round Number: ${BLUE}%-10s${RESET} 🔥 Streak: ${CYAN}%-10s${RESET}" "$round" "$streak"
-	echo -e "\n🎲 Current Event: ${PURPLE}"$current_event"${RESET}"
-	echo -e "${RED}=============================================================${RESET}"
+	printf "\n⏰ Round Number: ${BLUE}%-10s${RESET} 🔥 Streak: ${CYAN}%-10s${RESET}" "$((round + 1))" "$streak"
+	printf "\n🎲 Current Event: ${PURPLE}%-9s${RESET} ♟️  Active Item: ${PURPLE}%-10s${RESET}" "$current_event" "$active_item"
+	echo -e "\n${RED}=============================================================${RESET}"
 }
 
 dialogue_box() {
@@ -538,7 +615,7 @@ player_options() {
 				:
 				;;
 			3)
-				:
+				trigger_shop
 				;;
 			4)
 				main_menu
