@@ -7,12 +7,12 @@ GAME_TITLE=$(cat <<- "EOF"
 	==============================================================
 	==============================================================
 
-	██████╗ ██████╗ ██╗███╗   ██╗    ███████╗██╗     ██╗██████╗
+	 ██████╗ ██████╗ ██╗███╗   ██╗    ███████╗██╗     ██╗██████╗ 
 	██╔════╝██╔═══██╗██║████╗  ██║    ██╔════╝██║     ██║██╔══██╗
 	██║     ██║   ██║██║██╔██╗ ██║    █████╗  ██║     ██║██████╔╝
-	██║     ██║   ██║██║██║╚██╗██║    ██╔══╝  ██║     ██║██╔═══╝
-	╚██████╗╚██████╔╝██║██║ ╚████║    ██║     ███████╗██║██║
-	╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝    ╚═╝     ╚══════╝╚═╝╚═╝
+	██║     ██║   ██║██║██║╚██╗██║    ██╔══╝  ██║     ██║██╔═══╝ 
+	╚██████╗╚██████╔╝██║██║ ╚████║    ██║     ███████╗██║██║     
+	 ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝    ╚═╝     ╚══════╝╚═╝╚═╝     
 	A Game Where You Must Guess Between Heads or Tails
 
 	==============================================================
@@ -29,6 +29,7 @@ gold_balance=100
 streak=0
 multiplier=100
 round=0
+current_round=-1
 dialogue_bet="..."
 dialogue_multiplier="..."
 dialogue_event="..."
@@ -36,11 +37,13 @@ inventory=()
 event_list=("Tax Collector" "Inheritance" "Multiplier Boost" "Unlucky Day" "Mysterious Gift" "Streak Reset" "Lucky Day" "Wheel of Fortune" "Bankruptcy" "Slot Machine")
 current_event="..."
 shop_catalogue=("Bet Insurance" "4-Leafed Clover" "Event Insurance" "Magic Dice" "Double Down Voucher" "Lucky Coin" "Shop Coupon" "Cursed Token")
+shop_catalogue_costs=(750 1000 1250 250 500 750 500 1250)
 current_shop=()
+current_shop_costs=()
 active_item="..."
 # Bet Insurance: Lose 50% of the next bet
 # 4-Leafed Clover: Guarantees a win on the next bet
-# Event Inusrance: Protects against one instance of event coin loss the next round
+# Event Insurance: Protects against one instance of event coin loss the next round
 # Magic Dice: Rerolls the shop's current items
 # Double Down Voucher: Gain double or lose double your next bet
 # Lucky Coin: Refund your next bet if it's a loss
@@ -90,6 +93,19 @@ get_player_name() {
 # =============================================================
 main_menu() {
 	clear
+
+	gold_balance=5000
+	streak=4
+	multiplier=100
+	round=0
+	dialogue_bet="..."
+	dialogue_multiplier="..."
+	dialogue_event="..."
+	inventory=()
+	current_event="..."
+	current_shop=()
+	current_shop_costs=()
+	active_item="..."
 
 	echo "${RED}$GAME_TITLE${RESET}"
 	
@@ -301,6 +317,16 @@ standard_mode() {
 
 infinite_mode() {
 	clear
+
+	while [[ "$gold_balance" -ge 10 ]]
+	do
+		clear
+		trigger_event
+		game_banner
+		player_stats
+		dialogue_box
+		player_options
+	done
 }
 
 # =============================================================
@@ -362,6 +388,7 @@ place_bet() {
 
 flip_coin() {
 	clear
+	dialogue_multiplier="..."
 
 	echo -e "${RED}FLIPPING COIN...${RESET}"
 	sleep 1.5
@@ -384,20 +411,15 @@ flip_coin() {
 		then
 			if [[ $((streak % 5)) -eq 0 ]]
 			then
-				multiplier=$((multiplier + (streak / 5) * 50))
+				multiplier=$((multiplier + 50))
 				dialogue_multiplier="Streak achieved! Multiplier increased to ${GREEN}$(display_multiplier)${RESET}."
-			elif [[ $((streak % 5)) -ne 0 ]]
-			then
-				dialogue_multiplier="..."
 			fi
-		elif [[ "$streak" -lt 5 && "$multiplier" -gt 100 ]]
-		then
-			multiplier=100
 		fi
 	else
 		gold_balance=$((gold_balance - bet_amount))
 		dialogue_bet="You guessed incorrectly. You lost ${YELLOW}$bet_amount${RESET} coins."
 		streak=0
+		multiplier=100
 	fi
 
 	round=$((round + 1))
@@ -499,13 +521,19 @@ trigger_shop() {
 
 	if [[ $((round % 5)) -eq 0 || "$round" -eq 0 ]]
 	then
-		current_shop=()
+		if [[ "$round" -ne "$current_round" ]]
+		then
+			current_round="$round"
 
-		for (( i=1; i<=3; i++))
-		do
-			local shop_index=$((RANDOM % ${#shop_catalogue[@]}))
-			current_shop+=("${shop_catalogue[shop_index]}")
-		done
+			current_shop=()
+
+			for (( i=0; i<3; i++ ))
+			do
+				local shop_index=$((RANDOM % ${#shop_catalogue[@]}))
+				current_shop+=("${shop_catalogue[$shop_index]}")
+				current_shop_costs+=("${shop_catalogue_costs[$shop_index]}")
+			done
+		fi
 	fi
 
 	cat <<- EOF
@@ -519,7 +547,8 @@ trigger_shop() {
 
 	for i in "${!current_shop[@]}"
 	do
-		printf "Item: ${PURPLE}%s${RESET}\n\n" "${current_shop[$i]}"
+		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[$i]}"
+		printf "Cost: ${YELLOW}%d${RESET} coins\n\n" "${current_shop_costs[$i]}"
 	done
 
 	cat <<- EOF
@@ -541,13 +570,127 @@ trigger_shop() {
 		read -p " >  " choice
 		case "$choice" in
 			1)
-				:
+				if [[ "$gold_balance" -ge "${current_shop_costs[0]}" ]]
+				then
+					if [[ "${#inventory[@]}" -lt 3 ]]
+					then
+						inventory+=("${current_shop[0]}")
+						gold_balance=$((gold_balance - current_shop_costs[0]))
+						clear
+						
+						echo -e "You have purchased ${PURPLE}${current_shop[0]}${RESET}.\n"
+						echo "Your current inventory contains:"
+						for item in "${inventory[@]}"
+						do
+							printf "${PURPLE}%s${RESET}\n" "$item"
+						done
+
+						echo -e "\nYou have ${YELLOW}$gold_balance${RESET} coins left."
+						echo -e "\n${RED}[1]${RESET} Return to Game"
+
+						choice=""
+						while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
+						do
+							read -p " >  " choice
+							case "$choice" in
+								1)
+									return
+									;;
+								*)
+									echo -e "${RED}Enter a valid numerical input.${RESET}"
+									;;
+							esac
+						done
+					else
+						echo -e "${RED}Your inventory is currently full.${RESET}"
+						choice=-1
+					fi
+				else
+					echo -e "${RED}You do not have enough coins to purchase this item.${RESET}"
+					choice=-1
+				fi
 				;;
 			2)
-				:
+				if [[ "$gold_balance" -ge "${current_shop_costs[1]}" ]]
+				then
+					if [[ "${#inventory[@]}" -lt 3 ]]
+					then
+						inventory+=("${current_shop[1]}")
+						gold_balance=$((gold_balance - current_shop_costs[1]))
+						clear
+						
+						echo -e "You have purchased ${PURPLE}${current_shop[1]}${RESET}.\n"
+						echo "Your current inventory contains:"
+						for item in "${inventory[@]}"
+						do
+							printf "${PURPLE}%s${RESET}\n" "$item"
+						done
+
+						echo -e "\nYou have ${YELLOW}$gold_balance${RESET} coins left."
+						echo -e "\n${RED}[1]${RESET} Return to Game"
+						
+						choice=""
+						while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
+						do
+							read -p " >  " choice
+							case "$choice" in
+								1)
+									return
+									;;
+								*)
+									echo -e "${RED}Enter a valid numerical input.${RESET}"
+									;;
+							esac
+						done
+					else
+						echo -e "${RED}Your inventory is currently full.${RESET}"
+						choice=-1
+					fi
+				else
+					echo -e "${RED}You do not have enough coins to purchase this item.${RESET}"
+					choice=-1
+				fi
 				;;
 			3)
-				:
+				if [[ "$gold_balance" -ge "${current_shop_costs[2]}" ]]
+				then
+					if [[ "${#inventory[@]}" -lt 3 ]]
+					then
+						inventory+=("${current_shop[2]}")
+						gold_balance=$((gold_balance - current_shop_costs[2]))
+						clear
+						
+						echo -e "You have purchased ${PURPLE}${current_shop[2]}${RESET}.\n"
+						echo "Your current inventory contains:"
+						for item in "${inventory[@]}"
+						do
+							printf "${PURPLE}%s${RESET}\n" "$item"
+						done
+
+						echo -e "\nYou have ${YELLOW}$gold_balance${RESET} coins left."
+						echo -e "\n${RED}[1]${RESET} Return to Game"
+						
+						choice=""
+						while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
+						do
+							read -p " >  " choice
+							case "$choice" in
+								1)
+									return
+									;;
+								*)
+									echo -e "${RED}Enter a valid numerical input.${RESET}"
+									;;
+							esac
+						done
+					else
+						echo -e "${RED}Your inventory is currently full.${RESET}"
+						choice=-1
+					fi
+				else
+					echo -e "${RED}You do not have enough coins to purchase this item.${RESET}"
+					choice=-1
+				fi
 				;;
 			4)
 				return
@@ -579,9 +722,9 @@ game_banner() {
 
 player_stats() {
 	echo -e "👤 Player Name: ${WHITE}$player_name${RESET}\n"
-	printf "🪙  Gold Balance: ${YELLOW}%-10s${RESET} ❌ Multiplier: ${GREEN}%-10s${RESET}" "$gold_balance" "$(display_multiplier)"
-	printf "\n⏰ Round Number: ${BLUE}%-10s${RESET} 🔥 Streak: ${CYAN}%-10s${RESET}" "$((round + 1))" "$streak"
-	printf "\n🎲 Current Event: ${PURPLE}%-9s${RESET} ♟️  Active Item: ${PURPLE}%-10s${RESET}" "$current_event" "$active_item"
+	printf "🪙  Gold Balance: ${YELLOW}%-18s${RESET} ❌ Multiplier: ${GREEN}%-18s${RESET}" "$gold_balance" "$(display_multiplier)"
+	printf "\n⏰ Round Number: ${BLUE}%-18s${RESET} 🔥 Streak: ${CYAN}%-18s${RESET}" "$((round + 1))" "$streak"
+	printf "\n🎲 Current Event: ${PURPLE}%-17s${RESET} ♟️  Active Item: ${PURPLE}%-18s${RESET}" "$current_event" "$active_item"
 	echo -e "\n${RED}=============================================================${RESET}"
 }
 
