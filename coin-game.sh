@@ -40,6 +40,9 @@ shop_catalogue=("Bet Insurance" "4-Leafed Clover" "Event Insurance" "Magic Dice"
 shop_catalogue_costs=(750 1000 1250 250 500 750 500 1250)
 current_shop=()
 current_shop_costs=()
+shop_item1_purchased=0
+shop_item2_purchased=0
+shop_item3_purchased=0
 active_item="..."
 # Bet Insurance: Lose 50% of the next bet
 # 4-Leafed Clover: Guarantees a win on the next bet
@@ -51,7 +54,7 @@ active_item="..."
 # Cursed Token: Instantly double your multiplier, but lose 25% of your gold balance
 
 # ==============================================================
-# GAME COLOR VARIABLES
+# ANSI ESCAPE CODES VARIABLES
 # ==============================================================
 RED=$'\e[1;31m'
 GREEN=$'\e[1;32m'
@@ -61,6 +64,7 @@ PURPLE=$'\e[1;35m'
 CYAN=$'\e[1;36m'
 WHITE=$'\e[1;37m'
 RESET=$'\e[0m'
+STRIKETHROUGH=$'\e[9m'
 
 # =============================================================
 # DECIMAL DISPLAY SYSTEM
@@ -545,11 +549,32 @@ trigger_shop() {
 	
 	EOF
 
-	for i in "${!current_shop[@]}"
-	do
-		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[$i]}"
-		printf "Cost: ${YELLOW}%d${RESET} coins\n\n" "${current_shop_costs[$i]}"
-	done
+	if [[ shop_item1_purchased -eq 0 ]]
+	then
+		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[0]}"
+		printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[0]}"
+	else
+		printf "${STRIKETHROUGH}Item: %s${RESET}\n" "${current_shop[0]}"
+		printf "${STRIKETHROUGH}Cost: %s coins${RESET}\n\n" "${current_shop_costs[0]}"
+	fi
+
+	if [[ shop_item2_purchased -eq 0 ]]
+	then
+		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[1]}"
+		printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[1]}"
+	else
+		printf "${STRIKETHROUGH}Item: %s${RESET}\n" "${current_shop[1]}"
+		printf "${STRIKETHROUGH}Cost: %s coins${RESET}\n\n" "${current_shop_costs[1]}"
+	fi
+
+	if [[ shop_item3_purchased -eq 0 ]]
+	then
+		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[2]}"
+		printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[2]}"
+	else
+		printf "${STRIKETHROUGH}Item: %s${RESET}\n" "${current_shop[2]}"
+		printf "${STRIKETHROUGH}Cost: %s coins${RESET}\n\n" "${current_shop_costs[2]}"
+	fi
 
 	cat <<- EOF
 	You currently have ${YELLOW}$gold_balance${RESET} coins.
@@ -570,126 +595,149 @@ trigger_shop() {
 		read -p " >  " choice
 		case "$choice" in
 			1)
-				if [[ "$gold_balance" -ge "${current_shop_costs[0]}" ]]
+				if [[ shop_item1_purchased -eq 0 ]]
 				then
-					if [[ "${#inventory[@]}" -lt 3 ]]
+					if [[ "$gold_balance" -ge "${current_shop_costs[0]}" ]]
 					then
-						inventory+=("${current_shop[0]}")
-						gold_balance=$((gold_balance - current_shop_costs[0]))
-						clear
-						
-						echo -e "You have purchased ${PURPLE}${current_shop[0]}${RESET}.\n"
-						echo "Your current inventory contains:"
-						for item in "${inventory[@]}"
-						do
-							printf "${PURPLE}%s${RESET}\n" "$item"
-						done
+						if [[ "${#inventory[@]}" -lt 3 ]]
+						then
+							inventory+=("${current_shop[0]}")
+							gold_balance=$((gold_balance - current_shop_costs[0]))
+							shop_item1_purchased=1
+							clear
+							
+							echo -e "You have purchased ${PURPLE}${current_shop[0]}${RESET}.\n"
+							echo "Your current inventory contains:"
+							for item in "${inventory[@]}"
+							do
+								printf "${PURPLE}%s${RESET}\n" "$item"
+							done
 
-						echo -e "\nYou have ${YELLOW}$gold_balance${RESET} coins left."
-						echo -e "\n${RED}[1]${RESET} Return to Game"
+							echo -e "\nYou have ${YELLOW}$gold_balance${RESET} coins left."
+							echo -e "\n${RED}[1]${RESET} Return to Game"
 
-						choice=""
-						while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
-						do
-							read -p " >  " choice
-							case "$choice" in
-								1)
-									return
-									;;
-								*)
-									echo -e "${RED}Enter a valid numerical input.${RESET}"
-									;;
-							esac
-						done
+							choice=""
+							while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
+							do
+								read -p " >  " choice
+								case "$choice" in
+									1)
+										return
+										;;
+									*)
+										echo -e "${RED}Enter a valid numerical input.${RESET}"
+										;;
+								esac
+							done
+						else
+							echo -e "${RED}Your inventory is currently full.${RESET}"
+							choice=0
+						fi
 					else
-						echo -e "${RED}Your inventory is currently full.${RESET}"
-						choice=-1
+						echo -e "${RED}You do not have enough coins to purchase this item.${RESET}"
+						choice=0
 					fi
 				else
-					echo -e "${RED}You do not have enough coins to purchase this item.${RESET}"
-					choice=-1
+					echo -e "${RED}You have already purchased this item.${RESET}"
+					choice=0
 				fi
 				;;
 			2)
-				if [[ "$gold_balance" -ge "${current_shop_costs[1]}" ]]
+				if [[ shop_item2_purchased -eq 0 ]]
 				then
-					if [[ "${#inventory[@]}" -lt 3 ]]
+					if [[ "$gold_balance" -ge "${current_shop_costs[1]}" ]]
 					then
-						inventory+=("${current_shop[1]}")
-						gold_balance=$((gold_balance - current_shop_costs[1]))
-						clear
-						
-						echo -e "You have purchased ${PURPLE}${current_shop[1]}${RESET}.\n"
-						echo "Your current inventory contains:"
-						for item in "${inventory[@]}"
-						do
-							printf "${PURPLE}%s${RESET}\n" "$item"
-						done
+						if [[ "${#inventory[@]}" -lt 3 ]]
+						then
+							inventory+=("${current_shop[1]}")
+							gold_balance=$((gold_balance - current_shop_costs[1]))
+							shop_item2_purchased=1
+							clear
+							
+							echo -e "You have purchased ${PURPLE}${current_shop[1]}${RESET}.\n"
+							echo "Your current inventory contains:"
+							for item in "${inventory[@]}"
+							do
+								printf "${PURPLE}%s${RESET}\n" "$item"
+							done
 
-						echo -e "\nYou have ${YELLOW}$gold_balance${RESET} coins left."
-						echo -e "\n${RED}[1]${RESET} Return to Game"
-						
-						choice=""
-						while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
-						do
-							read -p " >  " choice
-							case "$choice" in
-								1)
-									return
-									;;
-								*)
-									echo -e "${RED}Enter a valid numerical input.${RESET}"
-									;;
-							esac
-						done
+							echo -e "\nYou have ${YELLOW}$gold_balance${RESET} coins left."
+							echo -e "\n${RED}[1]${RESET} Return to Game"
+
+							choice=""
+							while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
+							do
+								read -p " >  " choice
+								case "$choice" in
+									1)
+										return
+										;;
+									*)
+										echo -e "${RED}Enter a valid numerical input.${RESET}"
+										;;
+								esac
+							done
+						else
+							echo -e "${RED}Your inventory is currently full.${RESET}"
+							choice=0
+						fi
 					else
-						echo -e "${RED}Your inventory is currently full.${RESET}"
-						choice=-1
+						echo -e "${RED}You do not have enough coins to purchase this item.${RESET}"
+						choice=0
 					fi
 				else
-					echo -e "${RED}You do not have enough coins to purchase this item.${RESET}"
-					choice=-1
+					echo -e "${RED}You have already purchased this item.${RESET}"
+					choice=0
 				fi
 				;;
 			3)
-				if [[ "$gold_balance" -ge "${current_shop_costs[2]}" ]]
+				if [[ shop_item3_purchased -eq 0 ]]
 				then
-					if [[ "${#inventory[@]}" -lt 3 ]]
+					if [[ "$gold_balance" -ge "${current_shop_costs[2]}" ]]
 					then
-						inventory+=("${current_shop[2]}")
-						gold_balance=$((gold_balance - current_shop_costs[2]))
-						clear
-						
-						echo -e "You have purchased ${PURPLE}${current_shop[2]}${RESET}.\n"
-						echo "Your current inventory contains:"
-						for item in "${inventory[@]}"
-						do
-							printf "${PURPLE}%s${RESET}\n" "$item"
-						done
+						if [[ "${#inventory[@]}" -lt 3 ]]
+						then
+							inventory+=("${current_shop[2]}")
+							gold_balance=$((gold_balance - current_shop_costs[2]))
+							shop_item3_purchased=1
+							clear
+							
+							echo -e "You have purchased ${PURPLE}${current_shop[2]}${RESET}.\n"
+							echo "Your current inventory contains:"
+							for item in "${inventory[@]}"
+							do
+								printf "${PURPLE}%s${RESET}\n" "$item"
+							done
 
-						echo -e "\nYou have ${YELLOW}$gold_balance${RESET} coins left."
-						echo -e "\n${RED}[1]${RESET} Return to Game"
-						
-						choice=""
-						while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
-						do
-							read -p " >  " choice
-							case "$choice" in
-								1)
-									return
-									;;
-								*)
-									echo -e "${RED}Enter a valid numerical input.${RESET}"
-									;;
-							esac
-						done
+							echo -e "\nYou have ${YELLOW}$gold_balance${RESET} coins left."
+							echo -e "\n${RED}[1]${RESET} Return to Game"
+
+							choice=""
+							while [[ "$choice" -ne 1 && "$choice" -ne 2 ]]
+							do
+								read -p " >  " choice
+								case "$choice" in
+									1)
+										return
+										;;
+									*)
+										echo -e "${RED}Enter a valid numerical input.${RESET}"
+										;;
+								esac
+							done
+						else
+							echo -e "${RED}Your inventory is currently full.${RESET}"
+							choice=0
+						fi
 					else
-						echo -e "${RED}Your inventory is currently full.${RESET}"
-						choice=-1
+						echo -e "${RED}You do not have enough coins to purchase this item.${RESET}"
+						choice=0
 					fi
 				else
-					echo -e "${RED}You do not have enough coins to purchase this item.${RESET}"
-					choice=-1
+					echo -e "${RED}You have already purchased this item.${RESET}"
+					display_shop[2]="${STRIKETHROUGH}${display_shop[0]}"
+					display_shop_costs[2]="${STRIKETHROUGH}${display_shop[0]}"
+					choice=0
 				fi
 				;;
 			4)
