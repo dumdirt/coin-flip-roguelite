@@ -4,19 +4,21 @@
 # FIGLET TITLES
 # ==============================================================
 GAME_TITLE=$(cat <<- "EOF"
-	==============================================================
-	==============================================================
+	===========================================================================
+	===========================================================================
 
-	 ██████╗ ██████╗ ██╗███╗   ██╗    ███████╗██╗     ██╗██████╗ 
-	██╔════╝██╔═══██╗██║████╗  ██║    ██╔════╝██║     ██║██╔══██╗
-	██║     ██║   ██║██║██╔██╗ ██║    █████╗  ██║     ██║██████╔╝
-	██║     ██║   ██║██║██║╚██╗██║    ██╔══╝  ██║     ██║██╔═══╝ 
-	╚██████╗╚██████╔╝██║██║ ╚████║    ██║     ███████╗██║██║     
-	 ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝    ╚═╝     ╚══════╝╚═╝╚═╝     
-	A Game Where You Must Guess Between Heads or Tails
 
-	==============================================================
-	=============================================================
+	         ██████╗ ██████╗ ██╗███╗   ██╗    ███████╗██╗     ██╗██████╗ 
+	        ██╔════╝██╔═══██╗██║████╗  ██║    ██╔════╝██║     ██║██╔══██╗
+	        ██║     ██║   ██║██║██╔██╗ ██║    █████╗  ██║     ██║██████╔╝
+	        ██║     ██║   ██║██║██║╚██╗██║    ██╔══╝  ██║     ██║██╔═══╝ 
+	        ╚██████╗╚██████╔╝██║██║ ╚████║    ██║     ███████╗██║██║     
+	         ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝    ╚═╝     ╚══════╝╚═╝╚═╝     
+	            A Game Where You Must Guess Between Heads or Tails
+
+
+	===========================================================================
+	===========================================================================
 
 	EOF
 )
@@ -99,7 +101,7 @@ main_menu() {
 	clear
 
 	gold_balance=5000
-	streak=4
+	streak=0
 	multiplier=100
 	round=0
 	dialogue_bet="..."
@@ -109,6 +111,9 @@ main_menu() {
 	current_event="..."
 	current_shop=()
 	current_shop_costs=()
+	shop_item1_purchased=0
+	shop_item2_purchased=0
+	shop_item3_purchased=0
 	active_item="..."
 
 	echo "${RED}$GAME_TITLE${RESET}"
@@ -150,8 +155,8 @@ new_game() {
 
 	echo -e "${RED}"
 	cat <<- "EOF"
-		==============================================================
-		==============================================================
+		===========================================================================
+		===========================================================================
 	EOF
 	echo -e "${RESET}"
 
@@ -160,8 +165,8 @@ new_game() {
 
 	echo -e "${RED}"
 	cat <<- "EOF"
-		==============================================================
-		==============================================================
+		===========================================================================
+		===========================================================================
 	EOF
 	echo -e "${RESET}"
 
@@ -207,8 +212,8 @@ game_info() {
 
 	echo -e "${RED}"
 	cat <<- "EOF"
-		==============================================================
-		==============================================================
+		===========================================================================
+		===========================================================================
 	EOF
 	echo -e "${RESET}"
 
@@ -216,15 +221,12 @@ game_info() {
 	echo "1. Select a game mode."
 	echo "2. Place your bet."
 	echo "3. Predict whether the coin will land on heads or tails."
-	echo "4. A correct bet will earn your wager multiplied by your"
-	echo "   multiplier."
+	echo "4. A correct bet will earn your wager multiplied by your multiplier."
 	echo "5. An incorrect bet will lose your wager."
 
 	echo -e "\n${RED}Shop System${RESET}"
-	echo "Every 5 rounds, the shop will reset, offering three items for"
-	echo "purchase."
-	echo "Each item will have a unique effect that can be used to your"
-	echo " advantage."
+	echo "Every 5 rounds, the shop will reset, offering three items for purchase."
+	echo "Each item will have a unique effect that can be used to your advantage."
 	echo "Items can be purchased with your current gold balance."
 
 	echo -e "\n${RED}Special Events${RESET}"
@@ -235,8 +237,8 @@ game_info() {
 
 	echo -e "${RED}"
 	cat <<- "EOF"
-		==============================================================
-		==============================================================
+		===========================================================================
+		===========================================================================
 	EOF
 	echo -e "${RESET}"
 
@@ -262,8 +264,8 @@ credits() {
 
 	echo -e "${RED}"
 	cat <<- "EOF"
-		==============================================================
-		==============================================================
+		===========================================================================
+		===========================================================================
 	EOF
 	echo -e "${RESET}"
 
@@ -272,8 +274,8 @@ credits() {
 
 	echo -e "${RED}"
 	cat <<- "EOF"
-		==============================================================
-		==============================================================
+		===========================================================================
+		===========================================================================
 	EOF
 	echo -e "${RESET}"
 
@@ -312,6 +314,7 @@ standard_mode() {
 	do
 		clear
 		trigger_event
+		reset_shop
 		game_banner
 		player_stats
 		dialogue_box
@@ -340,8 +343,8 @@ place_bet() {
 	clear
 	
 	cat <<- EOF
-	${RED}=============================================================${RESET}
-	${RED}=============================================================${RESET}
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
 
 	${RED}Betting Rules${RESET}
 	~~~ WARNING: Betting will end the current round. ~~~
@@ -350,8 +353,8 @@ place_bet() {
 	
 	You currently have ${YELLOW}$gold_balance${RESET} coins.
 
-	${RED}=============================================================${RESET}
-	${RED}=============================================================${RESET}
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
 
 	EOF
 
@@ -432,95 +435,98 @@ flip_coin() {
 trigger_event() {
 	if [[ $((round % 5)) -eq 0 && "$round" -ne 0 ]]
 	then
-		local event_index=$((RANDOM % ${#event_list[@]}))
-		current_event="${event_list[$event_index]}"
-		case "$current_event" in
+		if [[ "$round" -ne "$current_round" ]]
+		then
+			local event_index=$((RANDOM % ${#event_list[@]}))
+			current_event="${event_list[$event_index]}"
+			case "$current_event" in
 
-			# Tax Collector: Lose 10% of your current gold balance.
-			"Tax Collector")
-				local tax_amount=$((gold_balance / 10))
-				gold_balance=$((gold_balance - tax_amount))
-				dialogue_event="The Tax Collector has approaches... He takes ${YELLOW}$tax_amount${RESET} coins from you."
-				;;
-			
-			# Inheritance: Gain 100 coins.
-			"Inheritance")
-				gold_balance=$((gold_balance + 100))
-				dialogue_event="Your late relative has passed away. She left an inheritance of ${YELLOW}100${RESET} coins to you."
-				;;
-			
-			# Multiplier Boost: Increase streak by 5 and multiplier by 0.5x.
-			"Multiplier Boost")
-				streak=$((streak + 5))
-				multiplier=$((multiplier + 50))
-				dialogue_event="You won a few dealings... Your streak has increased by ${CYAN}5${RESET} and multiplier by ${GREEN}0.5x${RESET}."
-				;;
-			
-			# Unlucky Day: Lose 50 coins.
-			"Unlucky Day")
-				gold_balance=$((gold_balance - 50))
-				dialogue_event="You tried to deal with a shady dealer... You lost ${YELLOW}50${RESET} coins."
-				;;
-			
-			# Mysterious Gift: Gain a mystery item if your inventory is not full.
-			"Mysterious Gift")
-				if [[ "${#inventory[@]}" -lt 3 ]]
-				then
-					inventory+="Mystery Item"
-					dialogue_event="A man in a dark cloak approaches you and hands you a mysterious gift: ${PURPLE}Mystery Item${RESET}."
-				else
-					dialogue_event="A man in a dark cloak approaches you and offers you a mysterious gift... You decline, as your inventory is full."
-				fi
-				;;
-			
-			# Streak Reset: Streak is reset to 0.
-			"Streak Reset")
-				streak=0
-				dialogue_event="You had a bad day gambling... Your streak has been reset to ${CYAN}0${RESET}."
-				;;
-			
-			# Lucky Day: Gain 50 coins.
-			"Lucky Day")
-				gold_balance=$((gold_balance + 50))
-				dialogue_event="You found a lost wallet on the street. You gained ${YELLOW}50${RESET} coins."
-				;;
-			
-			# Wheel of Fortune: Randomly gain or lose 50% of your current gold balance.
-			"Wheel of Fortune")
-				local fortune_outcome=$((RANDOM % 2))
-				if [[ "$fortune_outcome" -eq 0 ]]
-				then
+				# Tax Collector: Lose 10% of your current gold balance.
+				"Tax Collector")
+					local tax_amount=$((gold_balance / 10))
+					gold_balance=$((gold_balance - tax_amount))
+					dialogue_event="The Tax Collector has approaches... He takes ${YELLOW}$tax_amount${RESET} coins from you."
+					;;
+				
+				# Inheritance: Gain 100 coins.
+				"Inheritance")
+					gold_balance=$((gold_balance + 100))
+					dialogue_event="Your late relative has left an inheritance of ${YELLOW}100${RESET} coins to you."
+					;;
+				
+				# Multiplier Boost: Increase streak by 5 and multiplier by 0.5x.
+				"Multiplier Boost")
+					streak=$((streak + 5))
+					multiplier=$((multiplier + 50))
+					dialogue_event="You won a few dealings... Your streak has increased by ${CYAN}5${RESET} and multiplier by ${GREEN}0.5x${RESET}."
+					;;
+				
+				# Unlucky Day: Lose 50 coins.
+				"Unlucky Day")
+					gold_balance=$((gold_balance - 50))
+					dialogue_event="You tried to deal with a shady dealer and lost ${YELLOW}50${RESET} coins."
+					;;
+				
+				# Mysterious Gift: Gain a mystery item if your inventory is not full.
+				"Mysterious Gift")
+					if [[ "${#inventory[@]}" -lt 3 ]]
+					then
+						inventory+="Mystery Item"
+						dialogue_event="A man in a dark cloak hands you a mysterious gift: ${PURPLE}Mystery Item${RESET}."
+					else
+						dialogue_event="A man in a dark cloak offers you a mysterious gift... You decline, as your inventory is full."
+					fi
+					;;
+				
+				# Streak Reset: Streak is reset to 0.
+				"Streak Reset")
+					streak=0
+					dialogue_event="You had a bad day gambling... Your streak has been reset to ${CYAN}0${RESET}."
+					;;
+				
+				# Lucky Day: Gain 50 coins.
+				"Lucky Day")
+					gold_balance=$((gold_balance + 50))
+					dialogue_event="You found a lost wallet with ${YELLOW}50${RESET} coins."
+					;;
+				
+				# Wheel of Fortune: Randomly gain or lose 50% of your current gold balance.
+				"Wheel of Fortune")
+					local fortune_outcome=$((RANDOM % 2))
+					if [[ "$fortune_outcome" -eq 0 ]]
+					then
+						local loss_amount=$((gold_balance / 2))
+						gold_balance=$((gold_balance - loss_amount))
+						dialogue_event="The Wheel of Fortune was unlucky! You lost ${YELLOW}$loss_amount${RESET} coins."
+					else
+						local gain_amount=$((gold_balance / 2))
+						gold_balance=$((gold_balance + gain_amount))
+						dialogue_event="The Wheel of Fortune was lucky! You gained ${YELLOW}$gain_amount${RESET} coins."
+					fi
+					;;
+				
+				# Bankruptcy: Lose 50% of your current gold balance.
+				"Bankruptcy")
 					local loss_amount=$((gold_balance / 2))
 					gold_balance=$((gold_balance - loss_amount))
-					dialogue_event="The Wheel of Fortune was unlucky! You lost ${YELLOW}$loss_amount${RESET} coins."
-				else
-					local gain_amount=$((gold_balance / 2))
-					gold_balance=$((gold_balance + gain_amount))
-					dialogue_event="The Wheel of Fortune was lucky! You gained ${YELLOW}$gain_amount${RESET} coins."
-				fi
-				;;
-			
-			# Bankruptcy: Lose 50% of your current gold balance.
-			"Bankruptcy")
-				local loss_amount=$((gold_balance / 2))
-				gold_balance=$((gold_balance - loss_amount))
-				dialogue_event="You went bankrupt! You lost ${YELLOW}$loss_amount${RESET} coins."
-				;;
-			
-			# Slot Machine: Randomly gain between 10 and 50 coins.
-			"Slot Machine")
-				local slot_gain=$((RANDOM % 41 + 10))
-				gold_balance=$((gold_balance + slot_gain))
-				dialogue_event="You played the slot machine and won ${YELLOW}$slot_gain${RESET} coins."
-				;;
-		esac
+					dialogue_event="You went bankrupt! You lost ${YELLOW}$loss_amount${RESET} coins."
+					;;
+				
+				# Slot Machine: Randomly gain between 10 and 50 coins.
+				"Slot Machine")
+					local slot_gain=$((RANDOM % 41 + 10))
+					gold_balance=$((gold_balance + slot_gain))
+					dialogue_event="You played the slot machine and won ${YELLOW}$slot_gain${RESET} coins."
+					;;
+			esac
+		fi
 	else
 		current_event="..."
 		dialogue_event="..."
 	fi
 }
 
-trigger_shop() {
+reset_shop() {
 	clear
 
 	if [[ $((round % 5)) -eq 0 || "$round" -eq 0 ]]
@@ -539,10 +545,14 @@ trigger_shop() {
 			done
 		fi
 	fi
+}
+
+display_shop() {
+	clear
 
 	cat <<- EOF
-	${RED}=============================================================${RESET}
-	${RED}=============================================================${RESET}
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
 
 	${RED}The Shop${RESET}
 	~~~ NOTICE: The inventory is limited to three items. ~~~
@@ -579,8 +589,8 @@ trigger_shop() {
 	cat <<- EOF
 	You currently have ${YELLOW}$gold_balance${RESET} coins.
 
-	${RED}=============================================================${RESET}
-	${RED}=============================================================${RESET}
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
 
 	EOF
 
@@ -735,8 +745,6 @@ trigger_shop() {
 					fi
 				else
 					echo -e "${RED}You have already purchased this item.${RESET}"
-					display_shop[2]="${STRIKETHROUGH}${display_shop[0]}"
-					display_shop_costs[2]="${STRIKETHROUGH}${display_shop[0]}"
 					choice=0
 				fi
 				;;
@@ -750,20 +758,71 @@ trigger_shop() {
 	done
 }
 
+view_inventory() {
+	clear
+
+	cat <<- EOF
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
+
+	${RED}The Inventory${RESET}
+	Your inventory contains the following items:
+
+	EOF
+	for item in "${inventory[@]}"
+	do
+		printf "${PURPLE}%s${RESET}\n\n" "$item"
+	done
+
+	cat <<- EOF
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
+
+	EOF
+
+	for (( i=0; i<${#inventory[@]}; i++ ))
+	do
+		echo -e "${RED}[$((i + 1))]${RESET} Use ${inventory[$i]}"
+	done
+	echo -e "${RED}[$((${#inventory[@]} + 1))]${RESET} Return to Game"
+
+	local choice=""
+	while true
+	do
+		read -p " >  " choice
+
+		if [[ "$choice" -ge 1 && "$choice" -le $((${#inventory[@]} + 1)) ]]
+		then
+			break
+		else
+			echo -e "${RED}Enter a valid numerical input.${RESET}"
+		fi
+	done
+
+	if [[ "$choice" -le ${#inventory[@]} ]]
+	then
+		active_item=${inventory[$((choice - 1))]}
+		unset "inventory[$((choice - 1))]"
+		inventory=("${inventory[@]}")
+	else
+		return
+	fi
+}
+
 # =============================================================
 # GAME UI
 # =============================================================
 game_banner() {
 	echo -e "${RED}"
 	cat <<- "EOF"
-	=============================================================
-	=============================================================
-	            ___ ___ ___ _  _   ___ _    ___ ___ 
-	           / __/ _ \_ _| \| | | __| |  |_ _| _ \
-	          | (_| (_) | || .` | | _|| |__ | ||  _/
-	           \___\___/___|_|\_| |_| |____|___|_|
-	=============================================================
-	=============================================================
+	===========================================================================
+	===========================================================================
+	                    ___ ___ ___ _  _   ___ _    ___ ___ 
+	                   / __/ _ \_ _| \| | | __| |  |_ _| _ \
+	                  | (_| (_) | || .` | | _|| |__ | ||  _/
+	                   \___\___/___|_|\_| |_| |____|___|_|
+	===========================================================================
+	===========================================================================
 	EOF
 	echo -e "${RESET}"
 }
@@ -773,7 +832,7 @@ player_stats() {
 	printf "🪙  Gold Balance: ${YELLOW}%-18s${RESET} ❌ Multiplier: ${GREEN}%-18s${RESET}" "$gold_balance" "$(display_multiplier)"
 	printf "\n⏰ Round Number: ${BLUE}%-18s${RESET} 🔥 Streak: ${CYAN}%-18s${RESET}" "$((round + 1))" "$streak"
 	printf "\n🎲 Current Event: ${PURPLE}%-17s${RESET} ♟️  Active Item: ${PURPLE}%-18s${RESET}" "$current_event" "$active_item"
-	echo -e "\n${RED}=============================================================${RESET}"
+	echo -e "\n${RED}===========================================================================${RESET}"
 }
 
 dialogue_box() {
@@ -783,7 +842,7 @@ dialogue_box() {
 	💬 ${dialogue_multiplier}
 	💬 ${dialogue_event}
 
-	${RED}=============================================================${RESET}
+	${RED}===========================================================================${RESET}
 
 	EOF
 }
@@ -803,10 +862,10 @@ player_options() {
 				place_bet
 				;;
 			2)
-				:
+				view_inventory
 				;;
 			3)
-				trigger_shop
+				display_shop
 				;;
 			4)
 				main_menu
