@@ -14,13 +14,32 @@ GAME_TITLE=$(cat <<- "EOF"
 	        ██║     ██║   ██║██║██║╚██╗██║    ██╔══╝  ██║     ██║██╔═══╝ 
 	        ╚██████╗╚██████╔╝██║██║ ╚████║    ██║     ███████╗██║██║     
 	         ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝    ╚═╝     ╚══════╝╚═╝╚═╝     
-	            A Game Where You Must Guess Between Heads or Tails
+	                A Simple Coin Flip-based Roguelite Game
 
 
 	===========================================================================
 	===========================================================================
 
 	EOF
+)
+
+GAME_OVER_TITLE=$(cat <<- "EOF"
+	===========================================================================
+	===========================================================================
+
+
+	 ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗ 
+	██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗
+	██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝
+	██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗
+	╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║
+	 ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝
+
+
+	===========================================================================
+	===========================================================================
+
+EOF
 )
 
 # ==============================================================
@@ -39,7 +58,7 @@ inventory=()
 event_list=("Tax Collector" "Inheritance" "Multiplier Boost" "Unlucky Day" "Mysterious Gift" "Streak Reset" "Lucky Day" "Wheel of Fortune" "Bankruptcy" "Slot Machine")
 current_event="..."
 shop_catalogue=("Bet Insurance" "4-Leafed Clover" "Event Insurance" "Magic Dice" "Double Down Voucher" "Lucky Coin" "Shop Coupon" "Cursed Token")
-shop_catalogue_costs=(750 1000 1250 250 500 750 500 1250)
+shop_catalogue_costs=(500 1250 1000 250 1000 750 500 1500)
 current_shop=()
 current_shop_costs=()
 shop_item1_purchased=0
@@ -47,6 +66,10 @@ shop_item2_purchased=0
 shop_item3_purchased=0
 active_item="..."
 multiplier_cap=0
+total_items=0
+total_events=0
+max_multiplier=0
+max_streak=0
 
 # ==============================================================
 # ANSI ESCAPE CODES VARIABLES
@@ -66,6 +89,10 @@ STRIKETHROUGH=$'\e[9m'
 # =============================================================
 display_multiplier() {
 	printf "x%d.%d" $((multiplier / 100)) $((multiplier % 100))
+}
+
+display_max_multiplier() {
+	printf "x%d.%d" $((max_multiplier / 100)) $((max_multiplier % 100))
 }
 
 # =============================================================
@@ -93,14 +120,16 @@ get_player_name() {
 main_menu() {
 	clear
 
-	gold_balance=5000
+	# Reset the main game variables
+	gold_balance=100
 	streak=0
 	multiplier=100
 	round=0
+	current_round=-1
 	dialogue_bet="..."
 	dialogue_multiplier="..."
 	dialogue_event="..."
-	inventory=("Mysterious Item")
+	inventory=()
 	current_event="..."
 	current_shop=()
 	current_shop_costs=()
@@ -109,9 +138,14 @@ main_menu() {
 	shop_item3_purchased=0
 	active_item="..."
 	multiplier_cap=0
+	total_items=0
+	total_events=0
+	max_multiplier=0
+	max_streak=0
 
 	echo "${RED}$GAME_TITLE${RESET}"
 	
+	# Display user options
 	echo -e "\n${RED}[1]${RESET} New Game"
 	echo -e "${RED}[2]${RESET} How to Play"
 	echo -e "${RED}[3]${RESET} Credits"
@@ -144,6 +178,7 @@ main_menu() {
 # =============================================================
 # MAIN MENU OPTIONS
 # =============================================================
+
 new_game() {
 	clear
 
@@ -164,12 +199,17 @@ new_game() {
 	EOF
 	echo -e "${RESET}"
 
-	echo -e "${RED}[1]${RESET} Standard"
+
+	# Display user options
+
+	# Standard mode information
+	echo -e "${RED}[1]${RESET} Standard Mode"
 	echo "      In standard mode, you play with the objective of reaching"
 	echo "      a gold balance of 10,000 coins. You begin with 100 coins and"
 	echo -e "      can bet any amount of your current balance on each round.\n"
 
-	echo -e "${RED}[2]${RESET} Infinite"
+	# Infinite mode information
+	echo -e "${RED}[2]${RESET} Infinite Mode"
 	echo "      In infinite mode, there is no defined objective besides simply"
 	echo "      achieving the highest balance possible. You begin with 100 coins"
 	echo -e "      and can bet any amount of your current balance on each round.\n"
@@ -211,6 +251,7 @@ game_info() {
 	EOF
 	echo -e "${RESET}"
 
+	# Core gameplay information
 	echo -e "${RED}How to Play${RESET}"
 	echo "1. Select a game mode."
 	echo "2. Place your bet."
@@ -218,16 +259,24 @@ game_info() {
 	echo "4. A correct bet will earn your wager multiplied by your multiplier."
 	echo "5. An incorrect bet will lose your wager."
 
+	# Shop system information
 	echo -e "\n${RED}Shop System${RESET}"
 	echo "Every 5 rounds, the shop will reset, offering three items for purchase."
 	echo "Each item will have a unique effect that can be used to your advantage."
 	echo "Items can be purchased with your current gold balance."
 
+	# Inventory system information
+	echo -e "\n${RED}Inventory System${RESET}"
+	echo "A maximum of 3 items may be stored in your inventory at once."
+	echo "Using an item will permanently delete it from your inventory."
+	echo "Items must be active for their effects to apply."
+
+	# Event information
 	echo -e "\n${RED}Special Events${RESET}"
-	echo "Every 5 rounds, a special event will occur that can either help"
-	echo "or hinder your progress."
-	echo "Events can range from a simple balance increase or decrease to"
-	echo "a multiplier change or streak reset."
+	echo "Every 5 rounds, a special event will occur that can either help or"
+	echo "hinder your progress."
+	echo "Events can range from a simple balance increase or decrease to a"
+	echo "multiplier change or streak reset."
 
 	echo -e "${RED}"
 	cat <<- "EOF"
@@ -236,6 +285,7 @@ game_info() {
 	EOF
 	echo -e "${RESET}"
 
+	# Display user options
 	echo -e "${RED}[1]${RESET} Return to Main Menu"
 
 	local choice=""
@@ -263,6 +313,7 @@ credits() {
 	EOF
 	echo -e "${RESET}"
 
+	# Credits for game contributors
 	echo -e "${RED}Credits${RESET}"
 	echo "This game was created by dirtblock, also known as dumdirt."
 
@@ -273,6 +324,7 @@ credits() {
 	EOF
 	echo -e "${RESET}"
 
+	# Display user options
 	echo -e "${RED}[1]${RESET} Return to Main Menu"
 
 	local choice=""
@@ -303,7 +355,9 @@ exit_game() {
 # =============================================================
 standard_mode() {
 	clear
+	SECONDS=0
 
+	# Check if gold_balance is sufficient to continue the game
 	while [[ "$gold_balance" -lt 10000 && "$gold_balance" -ge 10 ]]
 	do
 		clear
@@ -314,20 +368,32 @@ standard_mode() {
 		dialogue_box
 		player_options
 	done
+
+	if [[ "gold_balance" -ge 10000 ]]
+	then
+		game_win
+	else
+		game_over
+	fi
 }
 
 infinite_mode() {
 	clear
+	SECONDS=0
 
+	# Check if gold_balance is sufficient to continue the game
 	while [[ "$gold_balance" -ge 10 ]]
 	do
 		clear
 		trigger_event
+		reset_shop
 		game_banner
 		player_stats
 		dialogue_box
 		player_options
 	done
+
+	game_over
 }
 
 # =============================================================
@@ -340,10 +406,10 @@ place_bet() {
 	${RED}===========================================================================${RESET}
 	${RED}===========================================================================${RESET}
 
-	${RED}Betting Rules${RESET}
-	~~~ WARNING: Betting will end the current round. ~~~
+	${RED}Betting Information${RESET}
+	~~~ NOTICE: Betting will end the current round. ~~~
 	1. All bets must be at least 10 coins and an integer number.
-	2. All winnings will be rounded down to the nearest whole number.
+	2. All winnings will be rounded down to the nearest integer number.
 	
 	You currently have ${YELLOW}$gold_balance${RESET} coins.
 
@@ -352,6 +418,7 @@ place_bet() {
 
 	EOF
 
+	# Get bet amount
 	echo -e "${RED}Enter your bet amount:${RESET}"
 	local bet_amount=""
 	while [[ "$bet_amount" -gt "$gold_balance" || "$bet_amount" -lt 10 || ! "$bet_amount" =~ ^[0-9]+$ ]]
@@ -359,6 +426,7 @@ place_bet() {
 		read -p " >  " bet_amount
 	done
 
+	# Get user input for coin flip
 	echo -e "${RED}Choose 'HEADS' or 'TAILS':${RESET}"
 	local player_guess=""
 	while [[ "$player_guess" != "HEADS" && "$player_guess" != "TAILS" ]]
@@ -366,6 +434,7 @@ place_bet() {
 		read -p " >  " player_guess
 	done
 
+	# Confirm or cancel bet
 	echo -e "\n${RED}[1]${RESET} Confirm Bet"
 	echo -e "${RED}[2]${RESET} Return to Game"
 	local choice=""
@@ -394,6 +463,7 @@ flip_coin() {
 	echo -e "${RED}FLIPPING COIN...${RESET}"
 	sleep 1.5
 
+	# Get result of coin flip
 	local coin_result=$((RANDOM % 2))
 	if [[ "$coin_result" -eq 0 ]]
 	then
@@ -402,17 +472,17 @@ flip_coin() {
 		coin_result="TAILS"
 	fi
 
-	echo "$player_guess"
-	echo "$coin_result"
-	sleep 3
-
+	# Guarantee win if 4-Leafed Clover is used
 	if [[ "$active_item" == "4-Leafed Clover" ]]
 	then
 		player_guess="$coin_result"
 	fi
 
+	# Check if player guess is equal to coin flip result
 	if [[ "$player_guess" == "$coin_result" ]]
 	then
+		
+		# Double Down Voucher: Doubles winnings if bet is won
 		if [[ "$active_item" == "Double Down Voucher" ]]
 		then
 			local double_down_winnings=$((bet_amount * 2 * multiplier / 100 ))
@@ -420,12 +490,9 @@ flip_coin() {
 			dialogue_bet="You guessed correctly and won ${YELLOW}$double_down_winnings${RESET} coins due to 'Double Down Voucher.'"
 			streak=$((streak + 1))
 			active_item="..."
-		elif [[ "$active_item" == "Cursed Token" ]]
-		then
-			local cursed_token_winnings=$((bet_amount * multiplier / 100))
-			gold_balance=$((gold_balance + cursed_token_winnings))
-			dialogue_bet="You guessed correctly and won ${YELLOW}$cursed_token_winnings${RESET} coins due to 'Cursed Token.'"
-			streak=$((streak + 1))
+		
+		# Add winnings to gold balance
+		# Increase streak by 1
 		else
 			local winnings=$((bet_amount * multiplier / 100))
 			gold_balance=$((gold_balance + winnings))
@@ -433,6 +500,8 @@ flip_coin() {
 			streak=$((streak + 1))
 		fi
 
+		# Check if multiplier is not capped and if streak is a multiple of 5
+		# Increase multiplier by 50 (x0.5)
 		if [[ "$multiplier_cap" -ne 1 ]]
 		then
 			if [[ "$streak" -ge 5 ]]
@@ -444,7 +513,23 @@ flip_coin() {
 				fi
 			fi
 		fi
+
+		# Check if max_streak is less than streak
+		# Set max_streak equal to streak
+		if [[ "$max_streak" -lt "$streak" ]]
+		then
+			max_streak="$streak"
+		fi
+
+		# Check if max_multiplier is less than multiplier
+		# Set max_multiplier equal to multiplier
+		if [[ "$max_multiplier" -lt "$multiplier" ]]
+		then
+			max_multiplier="$multiplier"
+		fi
 	else
+
+		# Bet Insurance: Reduces bet loss by 50%
 		if [[ "$active_item" == "Bet Insurance" ]]
 		then
 			local bet_insurance_loss=$((bet_amount / 2))
@@ -453,12 +538,16 @@ flip_coin() {
 			streak=0
 			multiplier=100
 			active_item="..."
+
+		# Lucky Coin: Refunds bet loss
 		elif [[ "$active_item" == "Lucky Coin" ]]
 		then
 			dialogue_bet="You guessed incorrectly, but lost ${YELLOW}0${RESET} coins due to 'Lucky Coin.'"
 			streak=0
 			multiplier=100
 			active_item="..."
+
+		# Double Down Voucher: Doubles the bet loss if bet is lost
 		elif [[ "$active_item" == "Double Down Voucher" ]]
 		then
 			local double_down_loss=$((bet_amount * 2))
@@ -467,6 +556,9 @@ flip_coin() {
 			streak=0
 			multiplier=100
 			active_item="..."
+
+		# Subtract losses from gold balance
+		# Reset streak to 0
 		else
 			gold_balance=$((gold_balance - bet_amount))
 			dialogue_bet="You guessed incorrectly. You lost ${YELLOW}$bet_amount${RESET} coins."
@@ -478,16 +570,22 @@ flip_coin() {
 		fi
 	fi
 
+	# Increase round by 1
 	round=$((round + 1))
 }
 
 trigger_event() {
+
+	# Check if round is a multiple of 5 and not equal to 0
 	if [[ $((round % 5)) -eq 0 && "$round" -ne 0 ]]
 	then
 		if [[ "$round" -ne "$current_round" ]]
 		then
+
+			# Get index from event_list for current_event
 			local event_index=$((RANDOM % ${#event_list[@]}))
 			current_event="${event_list[$event_index]}"
+			total_events=$((total_events + 1))
 			case "$current_event" in
 
 				# Tax Collector: Lose 10% of your current gold balance.
@@ -509,11 +607,15 @@ trigger_event() {
 					dialogue_event="Your late relative has left an inheritance of ${YELLOW}100${RESET} coins to you."
 					;;
 				
-				# Multiplier Boost: Increase streak by 5 and multiplier by 0.5x.
+				# Multiplier Boost: Increase multiplier by 0.5x.
 				"Multiplier Boost")
-					streak=$((streak + 5))
 					multiplier=$((multiplier + 50))
-					dialogue_event="You won a few dealings... Your streak has increased by ${CYAN}5${RESET} and multiplier by ${GREEN}0.5x${RESET}."
+					dialogue_event="You won a few dealings... Your multiplier has increased by ${GREEN}0.5x${RESET}."
+
+					if [[ "$max_multiplier" -lt "$multiplier" ]]
+					then
+						max_multiplier="$multiplier"
+					fi
 					;;
 				
 				# Unlucky Day: Lose 50 coins.
@@ -593,6 +695,7 @@ trigger_event() {
 					;;
 			esac
 
+			# Reset Event Insurance if event is encountered
 			if [[ "$active_item" == "Event Insurance" ]]
 			then
 				active_item="..."
@@ -607,7 +710,8 @@ trigger_event() {
 reset_shop() {
 	clear
 
-	if [[ $((round % 5)) -eq 0 || "$round" -eq 0 || "$active_item" == "Magic Dice" ]]
+	# Check if round is a multiple of 5 or if Magic Dice is used
+	if [[ $((round % 5)) -eq 0 || "$active_item" == "Magic Dice" ]]
 	then
 		if [[ "$round" -ne "$current_round" || "$active_item" == "Magic Dice" ]]
 		then
@@ -618,6 +722,8 @@ reset_shop() {
 			shop_item2_purchased=0
 			shop_item3_purchased=0
 
+			# Append 3 items to current_shop array
+			# Append 3 corresponding item costs to current_shop_costs array
 			for (( i=0; i<3; i++ ))
 			do
 				local shop_index=$((RANDOM % ${#shop_catalogue[@]}))
@@ -631,6 +737,7 @@ reset_shop() {
 display_shop() {
 	clear
 
+	# Reset Magic Dice if item is used
 	if [[ "$active_item" == "Magic Dice" ]]
 	then
 		active_item="..."
@@ -645,8 +752,11 @@ display_shop() {
 	
 	EOF
 
+	# Check shop_item1 purchase status
 	if [[ shop_item1_purchased -eq 0 ]]
 	then
+
+		# Display shop costs
 		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[0]}"
 		if [[ "$active_item" == "Shop Coupon" ]]
 		then
@@ -655,12 +765,17 @@ display_shop() {
 			printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[0]}"
 		fi
 	else
+
+		# Strikethrough shop costs
 		printf "${STRIKETHROUGH}Item: %s${RESET}\n" "${current_shop[0]}"
 		printf "${STRIKETHROUGH}Cost: %s coins${RESET}\n\n" "${current_shop_costs[0]}"
 	fi
 
+	# Check shop_item2 purchase status
 	if [[ shop_item2_purchased -eq 0 ]]
 	then
+
+		# Display shop costs
 		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[1]}"
 		if [[ "$active_item" == "Shop Coupon" ]]
 		then
@@ -669,12 +784,17 @@ display_shop() {
 			printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[1]}"
 		fi
 	else
+
+		# Strikethrough shop costs
 		printf "${STRIKETHROUGH}Item: %s${RESET}\n" "${current_shop[1]}"
 		printf "${STRIKETHROUGH}Cost: %s coins${RESET}\n\n" "${current_shop_costs[1]}"
 	fi
 
+	# Check shop_item3 purchase status
 	if [[ shop_item3_purchased -eq 0 ]]
 	then
+
+		# Display shop costs
 		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[2]}"
 		if [[ "$active_item" == "Shop Coupon" ]]
 		then
@@ -683,6 +803,8 @@ display_shop() {
 			printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[2]}"
 		fi
 	else
+
+		# Strikethrough shop costs
 		printf "${STRIKETHROUGH}Item: %s${RESET}\n" "${current_shop[2]}"
 		printf "${STRIKETHROUGH}Cost: %s coins${RESET}\n\n" "${current_shop_costs[2]}"
 	fi
@@ -695,6 +817,7 @@ display_shop() {
 
 	EOF
 
+	# Display user options
 	echo -e "${RED}[1]${RESET} Buy ${current_shop[0]}"
 	echo -e "${RED}[2]${RESET} Buy ${current_shop[1]}"
 	echo -e "${RED}[3]${RESET} Buy ${current_shop[2]}"
@@ -703,24 +826,37 @@ display_shop() {
 	local choice=""
 	while [[ "$choice" -ne 1 && "$choice" -ne 2 && "$choice" -ne 3 && "$choice" -ne 4 ]]
 	do
+
+		# Get user input
 		read -p " >  " choice
 		case "$choice" in
 			1)
+				# Check shop_item1 purchase status
 				if [[ shop_item1_purchased -eq 0 ]]
 				then
+
+					# Check if gold is sufficient to purchase item
 					if [[ "$gold_balance" -ge "${current_shop_costs[0]}" ]]
 					then
+
+						# Check if inventory is full
 						if [[ "${#inventory[@]}" -lt 3 ]]
 						then
+
+							# Add item to inventory
+							# Subtract cost from gold_balance
 							inventory+=("${current_shop[0]}")
 							gold_balance=$((gold_balance - current_shop_costs[0]))
 							shop_item1_purchased=1
+
+							# Reset Shop Coupon if item is used
 							if [[ "$active_item" == "Shop Coupon" ]]
 							then
 								active_item="..."
 							fi
 							clear
 							
+							# Display current inventory
 							echo -e "You have purchased ${PURPLE}${current_shop[0]}${RESET}.\n"
 							echo "Your current inventory contains:"
 							for item in "${inventory[@]}"
@@ -758,21 +894,32 @@ display_shop() {
 				fi
 				;;
 			2)
+				# Check shop_item2 purchase status
 				if [[ shop_item2_purchased -eq 0 ]]
 				then
+
+					# Check if gold is sufficient to purchase item
 					if [[ "$gold_balance" -ge "${current_shop_costs[1]}" ]]
 					then
+
+						# Check if inventory is full
 						if [[ "${#inventory[@]}" -lt 3 ]]
 						then
+
+							# Add item to inventory
+							# Subtract cost from gold_balance
 							inventory+=("${current_shop[1]}")
 							gold_balance=$((gold_balance - current_shop_costs[1]))
 							shop_item2_purchased=1
+
+							# Reset Shop Coupon if item is used
 							if [[ "$active_item" == "Shop Coupon" ]]
 							then
 								active_item="..."
 							fi
 							clear
 							
+							# Display current inventory
 							echo -e "You have purchased ${PURPLE}${current_shop[1]}${RESET}.\n"
 							echo "Your current inventory contains:"
 							for item in "${inventory[@]}"
@@ -810,21 +957,32 @@ display_shop() {
 				fi
 				;;
 			3)
+				# Check shop_item3 purchase status
 				if [[ shop_item3_purchased -eq 0 ]]
 				then
+
+					# Check if gold is sufficient to purchase item
 					if [[ "$gold_balance" -ge "${current_shop_costs[2]}" ]]
 					then
+
+						# Check if inventory is full
 						if [[ "${#inventory[@]}" -lt 3 ]]
 						then
+
+							# Add item to inventory
+							# Subtract cost from gold_balance
 							inventory+=("${current_shop[2]}")
 							gold_balance=$((gold_balance - current_shop_costs[2]))
 							shop_item3_purchased=1
+
+							# Reset Shop Coupon if item is used
 							if [[ "$active_item" == "Shop Coupon" ]]
 							then
 								active_item="..."
 							fi
 							clear
 							
+							# Display current inventory
 							echo -e "You have purchased ${PURPLE}${current_shop[2]}${RESET}.\n"
 							echo "Your current inventory contains:"
 							for item in "${inventory[@]}"
@@ -882,6 +1040,8 @@ view_inventory() {
 	Your inventory contains the following items:
 
 	EOF
+	
+	# Display current inventory
 	for item in "${inventory[@]}"
 	do
 		printf "${PURPLE}%s${RESET}\n\n" "$item"
@@ -893,6 +1053,7 @@ view_inventory() {
 
 	EOF
 
+	# Display user options to use items
 	for (( i=0; i<${#inventory[@]}; i++ ))
 	do
 		echo -e "${RED}[$((i + 1))]${RESET} Use ${inventory[$i]}"
@@ -904,6 +1065,7 @@ view_inventory() {
 	do
 		read -p " >  " choice
 
+		# Check if user input is valid
 		if [[ "$choice" -ge 1 && "$choice" -le $((${#inventory[@]} + 1)) ]]
 		then
 			break
@@ -912,17 +1074,27 @@ view_inventory() {
 		fi
 	done
 
+	# Check if user input is to use an item
 	if [[ "$choice" -le ${#inventory[@]} ]]
 	then
+
+		# Set active_item to used item
+		# Remove item from array and reindex
 		active_item=${inventory[$((choice - 1))]}
 		unset "inventory[$((choice - 1))]"
 		inventory=("${inventory[@]}")
+		total_items=$((total_items_used + 1))
 
 		if [[ "$active_item" == "Cursed Token" ]]
 		then
 			local cursed_token_loss=$((gold_balance / 4))
 			gold_balance=$((gold_balance - cursed_token_loss))
 			multiplier=$((multiplier + 100))
+
+			if [[ "$max_multiplier" -lt "$multiplier" ]]
+			then
+				max_multiplier="$multiplier"
+			fi
 		fi
 
 		if [[ "$active_item" == "Mysterious Item" ]]
@@ -938,6 +1110,7 @@ view_inventory() {
 mystery_item() {
 	clear
 
+	# Display user options for Mysterious Item
 	cat <<- EOF
 	${RED}A dark cloud envelops the room...${RESET}
 
@@ -979,12 +1152,15 @@ mystery_item() {
 
 	EOF
 
+	# Display user options
 	echo -e "${RED}[1]${RESET} Select Option 1"
 	echo -e "${RED}[2]${RESET} Select Option 2"
 	echo -e "${RED}[3]${RESET} Select Option 3"
 	echo -e "${RED}[4]${RESET} Select None"
 
 	local choice=""
+
+	# Check if user input is valid
 	while [[ "$choice" -ne 1 && "$choice" -ne 2 && "$choice" -ne 3 && "$choice" -ne 4 ]]
 	do
 		read -p " >  " choice
@@ -1004,6 +1180,11 @@ mystery_item() {
 				multiplier=300
 				gold_balance=$((gold_balance - gold_balance / 4))
 				active_item="..."
+
+				if [[ "$max_multiplier" -lt "$multiplier" ]]
+				then
+					max_multiplier="$multiplier"
+				fi
 				;;
 			4)
 				active_item="..."
@@ -1019,6 +1200,7 @@ mystery_item() {
 view_index() {
 	clear
 
+	# Display all items and usage information
 	cat <<- EOF
 	${RED}===========================================================================${RESET}
 	${RED}===========================================================================${RESET}
@@ -1067,6 +1249,7 @@ view_index() {
 
 	EOF
 
+	# Display user options
 	echo -e "${RED}[1]${RESET} Return to Game"
 
 	local choice=""
@@ -1123,6 +1306,8 @@ dialogue_box() {
 }
 
 player_options() {
+
+	# Display use roptions
 	echo -e "${RED}[1]${RESET} Place Bet"
 	echo -e "${RED}[2]${RESET} View Inventory"
 	echo -e "${RED}[3]${RESET} View Item Index"
@@ -1156,5 +1341,80 @@ player_options() {
 	done
 }
 
-# Start game by displaying the main menu
+# =============================================================
+# GAME END SCREENS
+# =============================================================
+game_over() {
+	clear
+
+	# Display user options
+	echo -e "${RED}$GAME_OVER_TITLE${RESET}\n"
+	echo -e "${RED}[1]${RESET} Return to Main Menu"
+	
+	local choice=""
+	while [[ "$choice" -ne 1 ]]
+	do
+		read -p " >  " choice
+		case "$choice" in
+			1)
+				main_menu
+				;;
+			*)
+				echo -e "${RED}Enter a valid numerical input.${RESET}"
+				;;
+		esac
+	done
+}
+
+game_win() {
+	clear
+
+	cat <<- EOF
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
+
+	${RED}Player Stats${RESET}
+
+	Player Name: ${WHITE}$player_name${RESET}
+
+	Time of completion: ${WHITE}$(date "+%H:%M:%S")${RESET}
+	                    ${WHITE}$(date "+%m-%d-%Y")${RESET}
+	Time Spent: ${WHITE}$SECONDS${RESET}
+
+	Highest Gold Balance Achieved: ${YELLOW}$gold_balance${RESET}
+
+	Highest Round Achieved: ${BLUE}$round${RESET}
+
+	Highest Multiplier Achieved: ${GREEN}$(display_max_multiplier)${RESET}
+
+	Highest Streak Achieved: ${CYAN}$max_streak${RESET}
+
+	Total Events Encountered: ${PURPLE}$total_events${RESET}
+
+	Total Items Used: ${PURPLE}$total_items${RESET}
+
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
+
+	EOF
+
+	# Display user options
+	echo -e "${RED}[1]${RESET} Return to Main Menu"
+
+	local choice=""
+	while [[ "$choice" -ne 1 ]]
+	do
+		read -p " >  " choice
+		case "$choice" in
+			1)
+				main_menu
+				;;
+			*)
+				echo -e "${RED}Enter a valid numerical input.${RESET}"
+				;;
+		esac
+	done
+}
+
+# Display main menu to start game
 main_menu
