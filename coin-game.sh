@@ -46,14 +46,7 @@ shop_item1_purchased=0
 shop_item2_purchased=0
 shop_item3_purchased=0
 active_item="..."
-# Bet Insurance: Lose 50% of the next bet
-# 4-Leafed Clover: Guarantees a win on the next bet
-# Event Insurance: Protects against one instance of event coin loss the next round
-# Magic Dice: Rerolls the shop's current items
-# Double Down Voucher: Gain double or lose double your next bet
-# Lucky Coin: Refund your next bet if it's a loss
-# Shop Coupon: Your next shop purchase costs 50% less
-# Cursed Token: Instantly double your multiplier, but lose 25% of your gold balance
+multiplier_cap=0
 
 # ==============================================================
 # ANSI ESCAPE CODES VARIABLES
@@ -107,7 +100,7 @@ main_menu() {
 	dialogue_bet="..."
 	dialogue_multiplier="..."
 	dialogue_event="..."
-	inventory=()
+	inventory=("Mysterious Item")
 	current_event="..."
 	current_shop=()
 	current_shop_costs=()
@@ -115,6 +108,7 @@ main_menu() {
 	shop_item2_purchased=0
 	shop_item3_purchased=0
 	active_item="..."
+	multiplier_cap=0
 
 	echo "${RED}$GAME_TITLE${RESET}"
 	
@@ -408,25 +402,80 @@ flip_coin() {
 		coin_result="TAILS"
 	fi
 
+	echo "$player_guess"
+	echo "$coin_result"
+	sleep 3
+
+	if [[ "$active_item" == "4-Leafed Clover" ]]
+	then
+		player_guess="$coin_result"
+	fi
+
 	if [[ "$player_guess" == "$coin_result" ]]
 	then
-		local winnings=$((bet_amount * multiplier / 100))
-		gold_balance=$((gold_balance + winnings))
-		dialogue_bet="You guessed correctly! You won ${YELLOW}$winnings${RESET} coins."
-		streak=$((streak + 1))
-		if [[ "$streak" -ge 5 ]]
+		if [[ "$active_item" == "Double Down Voucher" ]]
 		then
-			if [[ $((streak % 5)) -eq 0 ]]
+			local double_down_winnings=$((bet_amount * 2 * multiplier / 100 ))
+			gold_balance=$((gold_balance + double_down_winnings))
+			dialogue_bet="You guessed correctly and won ${YELLOW}$double_down_winnings${RESET} coins due to 'Double Down Voucher.'"
+			streak=$((streak + 1))
+			active_item="..."
+		elif [[ "$active_item" == "Cursed Token" ]]
+		then
+			local cursed_token_winnings=$((bet_amount * multiplier / 100))
+			gold_balance=$((gold_balance + cursed_token_winnings))
+			dialogue_bet="You guessed correctly and won ${YELLOW}$cursed_token_winnings${RESET} coins due to 'Cursed Token.'"
+			streak=$((streak + 1))
+		else
+			local winnings=$((bet_amount * multiplier / 100))
+			gold_balance=$((gold_balance + winnings))
+			dialogue_bet="You guessed correctly! You won ${YELLOW}$winnings${RESET} coins."
+			streak=$((streak + 1))
+		fi
+
+		if [[ "$multiplier_cap" -ne 1 ]]
+		then
+			if [[ "$streak" -ge 5 ]]
 			then
-				multiplier=$((multiplier + 50))
-				dialogue_multiplier="Streak achieved! Multiplier increased to ${GREEN}$(display_multiplier)${RESET}."
+				if [[ $((streak % 5)) -eq 0 ]]
+				then
+					multiplier=$((multiplier + 50))
+					dialogue_multiplier="Streak achieved! Multiplier increased to ${GREEN}$(display_multiplier)${RESET}."
+				fi
 			fi
 		fi
 	else
-		gold_balance=$((gold_balance - bet_amount))
-		dialogue_bet="You guessed incorrectly. You lost ${YELLOW}$bet_amount${RESET} coins."
-		streak=0
-		multiplier=100
+		if [[ "$active_item" == "Bet Insurance" ]]
+		then
+			local bet_insurance_loss=$((bet_amount / 2))
+			gold_balance=$((gold_balance - bet_insurance_loss))
+			dialogue_bet="You guessed incorrectly, but only lost ${YELLOW}$bet_insurance_loss${RESET} coins due to 'Bet Insurance.'"
+			streak=0
+			multiplier=100
+			active_item="..."
+		elif [[ "$active_item" == "Lucky Coin" ]]
+		then
+			dialogue_bet="You guessed incorrectly, but lost ${YELLOW}0${RESET} coins due to 'Lucky Coin.'"
+			streak=0
+			multiplier=100
+			active_item="..."
+		elif [[ "$active_item" == "Double Down Voucher" ]]
+		then
+			local double_down_loss=$((bet_amount * 2))
+			gold_balance=$((gold_balance - double_down_loss))
+			dialogue_bet="You guessed incorrectly and lost ${YELLOW}$double_down_loss${RESET} coins due to 'Double Down Voucher.'"
+			streak=0
+			multiplier=100
+			active_item="..."
+		else
+			gold_balance=$((gold_balance - bet_amount))
+			dialogue_bet="You guessed incorrectly. You lost ${YELLOW}$bet_amount${RESET} coins."
+			streak=0
+			if [[ "$active_item" != "Cursed Token" ]]
+			then
+				multiplier=100
+			fi
+		fi
 	fi
 
 	round=$((round + 1))
@@ -443,9 +492,15 @@ trigger_event() {
 
 				# Tax Collector: Lose 10% of your current gold balance.
 				"Tax Collector")
-					local tax_amount=$((gold_balance / 10))
-					gold_balance=$((gold_balance - tax_amount))
-					dialogue_event="The Tax Collector has approaches... He takes ${YELLOW}$tax_amount${RESET} coins from you."
+					if [[ "$active_item" == "Event Insurance" ]]
+					then
+						dialogue_event="Event Insurance has protected you from the Tax Collector."
+					elif [[ "$active_item" != "Event Insurance" ]]
+					then
+						local tax_amount=$((gold_balance / 10))
+						gold_balance=$((gold_balance - tax_amount))
+						dialogue_event="The Tax Collector has approaches... He takes ${YELLOW}$tax_amount${RESET} coins from you."
+					fi
 					;;
 				
 				# Inheritance: Gain 100 coins.
@@ -463,18 +518,24 @@ trigger_event() {
 				
 				# Unlucky Day: Lose 50 coins.
 				"Unlucky Day")
-					gold_balance=$((gold_balance - 50))
-					dialogue_event="You tried to deal with a shady dealer and lost ${YELLOW}50${RESET} coins."
+					if [[ "$active_item" == "Event Insurance" ]]
+					then
+						dialogue_event="Event Insurance has protected you from an Unlucky Day."
+					elif [[ "$active_item" != "Event Insurance" ]]
+					then
+						gold_balance=$((gold_balance - 50))
+						dialogue_event="You tried to deal with a shady dealer and lost ${YELLOW}50${RESET} coins."
+					fi
 					;;
 				
 				# Mysterious Gift: Gain a mystery item if your inventory is not full.
 				"Mysterious Gift")
 					if [[ "${#inventory[@]}" -lt 3 ]]
 					then
-						inventory+="Mystery Item"
-						dialogue_event="A man in a dark cloak hands you a mysterious gift: ${PURPLE}Mystery Item${RESET}."
+						inventory+=("Mystery Item")
+						dialogue_event="A man in a dark cloak hands you a gift: ${PURPLE}Mystery Item${RESET}."
 					else
-						dialogue_event="A man in a dark cloak offers you a mysterious gift... You decline, as your inventory is full."
+						dialogue_event="A man in a dark cloak offers you a gift... You decline, as your inventory is full."
 					fi
 					;;
 				
@@ -495,9 +556,15 @@ trigger_event() {
 					local fortune_outcome=$((RANDOM % 2))
 					if [[ "$fortune_outcome" -eq 0 ]]
 					then
-						local loss_amount=$((gold_balance / 2))
-						gold_balance=$((gold_balance - loss_amount))
-						dialogue_event="The Wheel of Fortune was unlucky! You lost ${YELLOW}$loss_amount${RESET} coins."
+						if [[ "$active_item" == "Event Insurance" ]]
+						then
+							dialogue_event="Event Insurance has protected you from a loss on the Wheel of Fortune."
+						elif [[ "$active_item" != "Event Insurance" ]]
+						then
+							local loss_amount=$((gold_balance / 2))
+							gold_balance=$((gold_balance - loss_amount))
+							dialogue_event="The Wheel of Fortune was unlucky! You lost ${YELLOW}$loss_amount${RESET} coins."
+						fi
 					else
 						local gain_amount=$((gold_balance / 2))
 						gold_balance=$((gold_balance + gain_amount))
@@ -507,9 +574,15 @@ trigger_event() {
 				
 				# Bankruptcy: Lose 50% of your current gold balance.
 				"Bankruptcy")
-					local loss_amount=$((gold_balance / 2))
-					gold_balance=$((gold_balance - loss_amount))
-					dialogue_event="You went bankrupt! You lost ${YELLOW}$loss_amount${RESET} coins."
+					if [[ "$active_item" == "Event Insurance" ]]
+					then
+						dialogue_event="Event Insurance has protected you from Bankruptcy."
+					elif [[ "$active_item" != "Event Insurance" ]]
+					then
+						local loss_amount=$((gold_balance / 2))
+						gold_balance=$((gold_balance - loss_amount))
+						dialogue_event="You went bankrupt! You lost ${YELLOW}$loss_amount${RESET} coins."
+					fi
 					;;
 				
 				# Slot Machine: Randomly gain between 10 and 50 coins.
@@ -519,6 +592,11 @@ trigger_event() {
 					dialogue_event="You played the slot machine and won ${YELLOW}$slot_gain${RESET} coins."
 					;;
 			esac
+
+			if [[ "$active_item" == "Event Insurance" ]]
+			then
+				active_item="..."
+			fi
 		fi
 	else
 		current_event="..."
@@ -529,13 +607,16 @@ trigger_event() {
 reset_shop() {
 	clear
 
-	if [[ $((round % 5)) -eq 0 || "$round" -eq 0 ]]
+	if [[ $((round % 5)) -eq 0 || "$round" -eq 0 || "$active_item" == "Magic Dice" ]]
 	then
-		if [[ "$round" -ne "$current_round" ]]
+		if [[ "$round" -ne "$current_round" || "$active_item" == "Magic Dice" ]]
 		then
 			current_round="$round"
-
 			current_shop=()
+			current_shop_costs=()
+			shop_item1_purchased=0
+			shop_item2_purchased=0
+			shop_item3_purchased=0
 
 			for (( i=0; i<3; i++ ))
 			do
@@ -550,6 +631,11 @@ reset_shop() {
 display_shop() {
 	clear
 
+	if [[ "$active_item" == "Magic Dice" ]]
+	then
+		active_item="..."
+	fi
+
 	cat <<- EOF
 	${RED}===========================================================================${RESET}
 	${RED}===========================================================================${RESET}
@@ -562,7 +648,12 @@ display_shop() {
 	if [[ shop_item1_purchased -eq 0 ]]
 	then
 		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[0]}"
-		printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[0]}"
+		if [[ "$active_item" == "Shop Coupon" ]]
+		then
+			printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "$((${current_shop_costs[0]} / 2))"
+		else
+			printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[0]}"
+		fi
 	else
 		printf "${STRIKETHROUGH}Item: %s${RESET}\n" "${current_shop[0]}"
 		printf "${STRIKETHROUGH}Cost: %s coins${RESET}\n\n" "${current_shop_costs[0]}"
@@ -571,7 +662,12 @@ display_shop() {
 	if [[ shop_item2_purchased -eq 0 ]]
 	then
 		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[1]}"
-		printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[1]}"
+		if [[ "$active_item" == "Shop Coupon" ]]
+		then
+			printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "$((${current_shop_costs[1]} / 2))"
+		else
+			printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[1]}"
+		fi
 	else
 		printf "${STRIKETHROUGH}Item: %s${RESET}\n" "${current_shop[1]}"
 		printf "${STRIKETHROUGH}Cost: %s coins${RESET}\n\n" "${current_shop_costs[1]}"
@@ -580,7 +676,12 @@ display_shop() {
 	if [[ shop_item3_purchased -eq 0 ]]
 	then
 		printf "Item: ${PURPLE}%s${RESET}\n" "${current_shop[2]}"
-		printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[2]}"
+		if [[ "$active_item" == "Shop Coupon" ]]
+		then
+			printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "$((${current_shop_costs[2]} / 2))"
+		else
+			printf "Cost: ${YELLOW}%s${RESET} coins\n\n" "${current_shop_costs[2]}"
+		fi
 	else
 		printf "${STRIKETHROUGH}Item: %s${RESET}\n" "${current_shop[2]}"
 		printf "${STRIKETHROUGH}Cost: %s coins${RESET}\n\n" "${current_shop_costs[2]}"
@@ -614,6 +715,10 @@ display_shop() {
 							inventory+=("${current_shop[0]}")
 							gold_balance=$((gold_balance - current_shop_costs[0]))
 							shop_item1_purchased=1
+							if [[ "$active_item" == "Shop Coupon" ]]
+							then
+								active_item="..."
+							fi
 							clear
 							
 							echo -e "You have purchased ${PURPLE}${current_shop[0]}${RESET}.\n"
@@ -662,6 +767,10 @@ display_shop() {
 							inventory+=("${current_shop[1]}")
 							gold_balance=$((gold_balance - current_shop_costs[1]))
 							shop_item2_purchased=1
+							if [[ "$active_item" == "Shop Coupon" ]]
+							then
+								active_item="..."
+							fi
 							clear
 							
 							echo -e "You have purchased ${PURPLE}${current_shop[1]}${RESET}.\n"
@@ -710,6 +819,10 @@ display_shop() {
 							inventory+=("${current_shop[2]}")
 							gold_balance=$((gold_balance - current_shop_costs[2]))
 							shop_item3_purchased=1
+							if [[ "$active_item" == "Shop Coupon" ]]
+							then
+								active_item="..."
+							fi
 							clear
 							
 							echo -e "You have purchased ${PURPLE}${current_shop[2]}${RESET}.\n"
@@ -804,13 +917,175 @@ view_inventory() {
 		active_item=${inventory[$((choice - 1))]}
 		unset "inventory[$((choice - 1))]"
 		inventory=("${inventory[@]}")
+
+		if [[ "$active_item" == "Cursed Token" ]]
+		then
+			local cursed_token_loss=$((gold_balance / 4))
+			gold_balance=$((gold_balance - cursed_token_loss))
+			multiplier=$((multiplier + 100))
+		fi
+
+		if [[ "$active_item" == "Mysterious Item" ]]
+		then
+			mystery_item
+		fi
+
 	else
 		return
 	fi
 }
 
+mystery_item() {
+	clear
+
+	cat <<- EOF
+	${RED}A dark cloud envelops the room...${RESET}
+
+
+	           ${WHITE}Option 1${RESET}
+	${WHITE}==============================${RESET}
+	
+	${GREEN}Gold:${RESET} Gain ${YELLOW}25%${RESET} of your
+	gold balance immediately
+
+	${RED}Multiplier:${RESET} Permanently reset and
+	cap your multiplier at ${GREEN}x1.0${RESET}
+
+	${WHITE}==============================${RESET}
+
+
+		        ${WHITE}Option 2${RESET}
+	${WHITE}==============================${RESET}
+	
+	${GREEN}Gold:${RESET} Gain ${YELLOW}1000${RESET} coins
+	instantly
+
+	${RED}Streak:${RESET} Instantly reset
+	your streak to ${CYAN}0${RESET}
+
+	${WHITE}==============================${RESET}
+
+
+		        ${WHITE}Option 3${RESET}
+	${WHITE}==============================${RESET}
+	
+	${GREEN}Multiplier:${RESET} Instantly set your
+	multiplier to ${GREEN}x3.0${RESET} (Non-Permanent)
+
+	${RED}Gold:${RESET} Lose ${YELLOW}25%${RESET} of your
+	gold balance immediately
+
+	${WHITE}==============================${RESET}
+
+	EOF
+
+	echo -e "${RED}[1]${RESET} Select Option 1"
+	echo -e "${RED}[2]${RESET} Select Option 2"
+	echo -e "${RED}[3]${RESET} Select Option 3"
+	echo -e "${RED}[4]${RESET} Select None"
+
+	local choice=""
+	while [[ "$choice" -ne 1 && "$choice" -ne 2 && "$choice" -ne 3 && "$choice" -ne 4 ]]
+	do
+		read -p " >  " choice
+		case "$choice" in
+			1)
+				gold_balance=$((gold_balance + gold_balance / 4))
+				multiplier=100
+				multiplier_cap=1
+				active_item="..."
+				;;
+			2)
+				gold_balance=$((gold_balance + 1000))
+				streak=0
+				active_item="..."
+				;;
+			3)
+				multiplier=300
+				gold_balance=$((gold_balance - gold_balance / 4))
+				active_item="..."
+				;;
+			4)
+				active_item="..."
+				return
+				;;
+			*)
+				echo -e "${RED}Enter a valid numerical input${RESET}"
+				;;
+		esac
+	done
+}
+
+view_index() {
+	clear
+
+	cat <<- EOF
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
+
+	${RED}The Index${RESET}
+	~~~ NOTICE: All items must be ACTIVE for effects to apply. ~~~
+	An index containing information on useable items:
+
+	${RED}===========================================================================${RESET}
+	${RED}===========================================================================${RESET}
+
+	1. ${PURPLE}Bet Insurance${RESET}
+	   Lose 50% of your next bet, given that it is a loss;
+	   Resets on round end
+	
+	2. ${PURPLE}4-Leafed Clover${RESET}
+	   Guarantees a win on your next bet;
+	   Resets on round end
+
+	3. ${PURPLE}Event Insurance${RESET}
+	   Guards against the next instance of coin loss from an event;
+	   Does not reset on round end
+	
+	4. ${PURPLE}Magic Dice${RESET}
+	   Rerolls the current shop, offering three new items;
+	   Does not reset on round end
+	
+	5. ${PURPLE}Double Down Voucher${RESET}
+	   Gain double or lose double on your next bet;
+	   Resets on round end
+	
+	6. ${PURPLE}Lucky Coin${RESET}
+	   Refund your next bet, given that it is a loss;
+	   Resets on round end
+
+	7. ${PURPLE}Shop Coupon${RESET}
+	   Gain a 50% discount on your next shop purchase;
+	   Does not on round end
+
+	8. ${PURPLE}Cursed Token${RESET}
+	   Gain plus x1.0 multiplier, but lose 25% of your current gold balance;
+	   Does not reset on round end
+
+	9. ${PURPLE}Mysterious Item${RESET}
+	   ???
+
+	EOF
+
+	echo -e "${RED}[1]${RESET} Return to Game"
+
+	local choice=""
+	while [[ "$choice" -ne 1 ]]
+	do
+		read -p " >  " choice
+		case "$choice" in
+			1)
+				return
+				;;
+			*)
+				echo -e "${RED}Enter a valid numerical input.${RESET}"
+				;;
+		esac
+	done
+}
+
 # =============================================================
-# GAME UI
+# MAIN GAME UI
 # =============================================================
 game_banner() {
 	echo -e "${RED}"
@@ -850,8 +1125,9 @@ dialogue_box() {
 player_options() {
 	echo -e "${RED}[1]${RESET} Place Bet"
 	echo -e "${RED}[2]${RESET} View Inventory"
-	echo -e "${RED}[3]${RESET} View Shop"
-	echo -e "${RED}[4]${RESET} Exit to Main Menu"
+	echo -e "${RED}[3]${RESET} View Item Index"
+	echo -e "${RED}[4]${RESET} View Shop"
+	echo -e "${RED}[5]${RESET} Exit to Main Menu"
 
 	local choice=""
 	while [[ "$choice" -ne 1 && "$choice" -ne 2 && "$choice" -ne 3 && "$choice" -ne 4 ]]
@@ -865,9 +1141,12 @@ player_options() {
 				view_inventory
 				;;
 			3)
-				display_shop
+				view_index
 				;;
 			4)
+				display_shop
+				;;
+			5)
 				main_menu
 				;;
 			*)
