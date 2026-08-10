@@ -121,6 +121,7 @@ main_menu() {
 	clear
 
 	# Reset the main game variables
+	player_name=""
 	gold_balance=100
 	streak=0
 	multiplier=100
@@ -130,7 +131,10 @@ main_menu() {
 	dialogue_multiplier="..."
 	dialogue_event="..."
 	inventory=()
+	event_list=("Tax Collector" "Inheritance" "Multiplier Boost" "Unlucky Day" "Mysterious Gift" "Streak Reset" "Lucky Day" "Wheel of Fortune" "Bankruptcy" "Slot Machine")
 	current_event="..."
+	shop_catalogue=("Bet Insurance" "4-Leafed Clover" "Event Insurance" "Magic Dice" "Double Down Voucher" "Lucky Coin" "Shop Coupon" "Cursed Token")
+	shop_catalogue_costs=(500 1250 1000 250 1000 750 500 1500)
 	current_shop=()
 	current_shop_costs=()
 	shop_item1_purchased=0
@@ -362,6 +366,12 @@ standard_mode() {
 	do
 		clear
 		trigger_event
+
+		if [[ "$gold_balance" -lt 10 ]]
+		then
+			break
+		fi
+
 		reset_shop
 		game_banner
 		player_stats
@@ -369,7 +379,7 @@ standard_mode() {
 		player_options
 	done
 
-	if [[ "gold_balance" -ge 10000 ]]
+	if [[ "$gold_balance" -ge 10000 ]]
 	then
 		game_win
 	else
@@ -386,6 +396,12 @@ infinite_mode() {
 	do
 		clear
 		trigger_event
+
+		if [[ "$gold_balance" -lt 10 ]]
+		then
+			break
+		fi
+
 		reset_shop
 		game_banner
 		player_stats
@@ -1267,6 +1283,22 @@ view_index() {
 	done
 }
 
+# check_game_end() {
+# 	if [[ "$gold_balance" -lt 10 ]]
+# 	then
+# 		game_over
+# 		return 0
+# 	fi
+
+# 	if [[ "$gold_balance" -ge 10000 ]]
+# 	then
+# 		game_win
+# 		return 0
+# 	fi
+
+# 	return 1
+# }
+
 # =============================================================
 # MAIN GAME UI
 # =============================================================
@@ -1379,7 +1411,7 @@ game_win() {
 
 	Time of completion: ${WHITE}$(date "+%H:%M:%S")${RESET}
 	                    ${WHITE}$(date "+%m-%d-%Y")${RESET}
-	Time Spent: ${WHITE}$SECONDS${RESET}
+	Time Spent: ${WHITE}$SECONDS${RESET} seconds
 
 	Highest Gold Balance Achieved: ${YELLOW}$gold_balance${RESET}
 
