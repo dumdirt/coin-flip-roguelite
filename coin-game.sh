@@ -1097,7 +1097,7 @@ view_inventory() {
 			fi
 		fi
 
-		if [[ "$active_item" == "Mysterious Item" ]]
+		if [[ "$active_item" == "Mystery Item" ]]
 		then
 			mystery_item
 		fi
@@ -1110,7 +1110,7 @@ view_inventory() {
 mystery_item() {
 	clear
 
-	# Display user options for Mysterious Item
+	# Display user options for Mystery Item
 	cat <<- EOF
 	${RED}A dark cloud envelops the room...${RESET}
 
@@ -1244,7 +1244,7 @@ view_index() {
 	   Gain plus x1.0 multiplier, but lose 25% of your current gold balance;
 	   Does not reset on round end
 
-	9. ${PURPLE}Mysterious Item${RESET}
+	9. ${PURPLE}Mystery Item${RESET}
 	   ???
 
 	EOF
