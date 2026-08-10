@@ -1,5 +1,5 @@
 # Coin Flip Roguelite
-This game is a simple coin flip-based roguelite game I made.
+This is a simple coin flip-based roguelite game in the Terminal that I made.
 
 ## How to Install
 To run this Bash shell script, you will need a shell that is able to interpret Bash.
