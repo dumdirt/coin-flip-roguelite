@@ -1283,22 +1283,6 @@ view_index() {
 	done
 }
 
-# check_game_end() {
-# 	if [[ "$gold_balance" -lt 10 ]]
-# 	then
-# 		game_over
-# 		return 0
-# 	fi
-
-# 	if [[ "$gold_balance" -ge 10000 ]]
-# 	then
-# 		game_win
-# 		return 0
-# 	fi
-
-# 	return 1
-# }
-
 # =============================================================
 # MAIN GAME UI
 # =============================================================
